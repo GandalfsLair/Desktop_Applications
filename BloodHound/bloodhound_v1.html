@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake BloodHound</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Fake BloodHound</h1>
+            <p>Simulated Active Directory Attack Path Analysis</p>
+        </header>
+        
+        <div class="scan-controls">
+            <button id="scanBtn">Start Fake Scan</button>
+            <div id="scanProgress"></div>
+        </div>
+
+        <div id="graph"></div>
+        
+        <div class="log-container">
+            <h3>Scan Logs</h3>
+            <pre id="logs"></pre>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProcCat Terminal</title>
+    <style>
+        /* Terminal styling */
+        body {
+            background-color: #121212;
+            color: #f0f0f0;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #terminal {
+            height: 90vh;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        #input-line {
+            display: flex;
+        }
+        #prompt {
+            color: #4CAF50;
+            margin-right: 10px;
+        }
+        #command-input {
+            background-color: transparent;
+            border: none;
+            color: #f0f0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            width: 80%;
+            outline: none;
+            flex-grow: 1;
+        }
+        .command {
+            color: #4CAF50;
+        }
+        .output {
+            margin: 5px 0 15px 0;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: #f44336;
+        }
+        .warning {
+            color: #FFC107;
+        }
+        .info {
+            color: #2196F3;
+        }
+        .process {
+            color: #9C27B0;
+        }
+        .pid {
+            color: #FF9800;
+        }
+        .success {
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal"></div>
+    <div id="input-line">
+        <span id="prompt">proccat></span>
+        <input type="text" id="command-input" autofocus>
+    </div>
+
+    <script>
+        // Process database - simulated processes with realistic names and PIDs
+        const processes = [
+            { pid: 1234, name: "explorer.exe", cpu: 2.5, memory: 120, user: "SYSTEM", status: "Running" },
+            { pid: 2345, name: "chrome.exe", cpu: 15.2, memory: 450, user: "user1", status: "Running" },
+            { pid: 3456, name: "spotify.exe", cpu: 8.7, memory: 320, user: "user1", status: "Running" },
+            { pid: 4567, name: "ssh-agent.exe", cpu: 0.3, memory: 15, user: "SYSTEM", status: "Running" },
+            { pid: 5678, name: "svchost.exe", cpu: 1.2, memory: 85, user: "NETWORK SERVICE", status: "Running" },
+            { pid: 6789, name: "malware.exe", cpu: 98.5, memory: 1024, user: "SYSTEM", status: "Running", hidden: true },
+            { pid: 7890, name: "lsass.exe", cpu: 3.1, memory: 210, user: "SYSTEM", status: "Running", protected: true },
+            { pid: 8901, name: "dllhost.exe", cpu: 0.8, memory: 65, user: "user1", status: "Running" }
+        ];
+
+        // Device database - simulated devices
+        const devices = [
+            { id: "cam1", name: "Integrated Webcam", type: "camera", status: "off" },
+            { id: "mic1", name: "Microphone Array", type: "microphone", status: "off" },
+            { id: "gps1", name: "GPS Module", type: "gps", status: "on" },
+            { id: "bt1", name: "Bluetooth Radio", type: "bluetooth", status: "on" }
+        ];
+
+        // Command history
+        let commandHistory = [];
+        let historyIndex = -1;
+
+        // DOM elements
+        const terminal = document.getElementById('terminal');
+        const commandInput = document.getElementById('command-input');
+        const prompt = document.getElementById('prompt');
+
+        // Initialize terminal
+        printWelcomeMessage();
+
+        // Set up command input handler
+        commandInput.addEventListener('keydown', handleCommandInput);
+
+        // Print welcome message
+        function printWelcomeMessage() {
+            const welcomeMessage = `
+██████╗ ██████╗  ██████╗  ██████╗ ██████╗  █████╗ ████████╗
+██╔══██╗██╔══██╗██╔═══██╗██╔════╝ ██╔══██╗██╔══██╗╚══██╔══╝
+██████╔╝██████╔╝██║   ██║██║  ███╗██████╔╝███████║   ██║   
+██╔═══╝ ██╔══██╗██║   ██║██║   ██║██╔══██╗██╔══██║   ██║   
+██║     ██║  ██║╚██████╔╝╚██████╔╝██████╔╝██║  ██║   ██║   
+╚═╝     ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   
+                                                            
+Process Control and Analysis Tool v1.3.7
+Type 'help' for available commands
+`;
+            addOutput(welcomeMessage, 'output');
+        }
+
+        // Handle command input
+        function handleCommandInput(e) {
+            if (e.key === 'Enter') {
+                const command = commandInput.value.trim();
+                if (command) {
+                    addOutput(command, 'command');
+                    commandHistory.push(command);
+                    historyIndex = commandHistory.length;
+                    processCommand(command);
+                    commandInput.value = '';
+                }
+            } else if (e.key === 'ArrowUp') {
+                // Navigate command history up
+                if (commandHistory.length > 0) {
+                    if (historyIndex > 0) historyIndex--;
+                    commandInput.value = commandHistory[historyIndex] || '';
+                }
+                e.preventDefault();
+            } else if (e.key === 'ArrowDown') {
+                // Navigate command history down
+                if (commandHistory.length > 0) {
+                    if (historyIndex < commandHistory.length - 1) historyIndex++;
+                    commandInput.value = commandHistory[historyIndex] || '';
+                }
+                e.preventDefault();
+            } else if (e.key === 'Tab') {
+                // Tab completion
+                e.preventDefault();
+                const partial = commandInput.value.trim();
+                if (partial) {
+                    const matches = getCommandMatches(partial);
+                    if (matches.length === 1) {
+                        commandInput.value = matches[0] + ' ';
+                    } else if (matches.length > 1) {
+                        addOutput(`Possible completions: ${matches.join(', ')}`, 'info');
+                    }
+                }
+            }
+        }
+
+        // Get matching commands for tab completion
+        function getCommandMatches(partial) {
+            const commands = [
+                'help', 'list', 'kill', 'inject', 'hijack', 'copy', 
+                'devices', 'connect', 'dump', 'modules', 'script', 'clear'
+            ];
+            return commands.filter(cmd => cmd.startsWith(partial));
+        }
+
+        // Process entered command
+        function processCommand(command) {
+            const parts = command.split(' ');
+            const cmd = parts[0].toLowerCase();
+            const args = parts.slice(1);
+
+            switch (cmd) {
+                case 'help':
+                    showHelp();
+                    break;
+                case 'list':
+                    listProcesses(args);
+                    break;
+                case 'kill':
+                    killProcess(args);
+                    break;
+                case 'inject':
+                    injectIntoProcess(args);
+                    break;
+                case 'hijack':
+                    hijackProcess(args);
+                    break;
+                case 'copy':
+                    copyProcess(args);
+                    break;
+                case 'devices':
+                    listDevices(args);
+                    break;
+                case 'connect':
+                    connectToDevice(args);
+                    break;
+                case 'dump':
+                    dumpMemory(args);
+                    break;
+                case 'modules':
+                    listModules(args);
+                    break;
+                case 'script':
+                    runScript(args);
+                    break;
+                case 'clear':
+                    clearTerminal();
+                    break;
+                default:
+                    addOutput(`Command not found: ${cmd}. Type 'help' for available commands.`, 'error');
+            }
+        }
+
+        // Show help information
+        function showHelp() {
+            const helpText = `
+Available commands:
+
+Process Control:
+  list [options]            List all running processes
+    options:
+      -a, --all            Show all processes (including hidden/system)
+      -u, --user <name>    Filter by user
+      -s, --sort <field>   Sort by field (pid, name, cpu, memory)
+  
+  kill <pid> [options]     Kill a process by PID
+    options:
+      -f, --force          Force kill (no graceful shutdown)
+  
+  inject <pid> <payload>   Inject code into a process
+    payloads:
+      shellcode            Inject remote shell
+      keylogger            Inject keylogger module
+      hook                 Hook specific functions
+  
+  hijack <pid>             Hijack process I/O
+  copy <pid> [new_name]    Copy process memory to new process
+
+Device Control:
+  devices                  List available devices
+  connect <device> [opts]  Connect to a device
+    options:
+      --start             Start device
+      --stop              Stop device
+      --stream <target>    Stream device output
+
+Memory Analysis:
+  dump <pid>               Dump process memory
+  modules <pid>            List loaded modules
+
+Other:
+  script <file>           Run a script file
+  clear                   Clear the terminal
+  help                    Show this help message
+`;
+            addOutput(helpText, 'output');
+        }
+
+        // List running processes
+        function listProcesses(args) {
+            let filteredProcesses = [...processes];
+            let sortField = 'pid';
+            
+            // Parse arguments
+            for (let i = 0; i < args.length; i++) {
+                const arg = args[i];
+                if (arg === '-a' || arg === '--all') {
+                    // Show all processes (no filtering)
+                } else if (arg === '-u' || arg === '--user') {
+                    const user = args[++i];
+                    filteredProcesses = filteredProcesses.filter(p => p.user === user);
+                } else if (arg === '-s' || arg === '--sort') {
+                    sortField = args[++i];
+                }
+            }
+            
+            // Sort processes
+            filteredProcesses.sort((a, b) => {
+                if (a[sortField] < b[sortField]) return -1;
+                if (a[sortField] > b[sortField]) return 1;
+                return 0;
+            });
+            
+            // Generate process list output
+            let output = "PID\tName\t\t\tCPU\tMemory\tUser\t\tStatus\n";
+            output += "-----------------------------------------------------------------\n";
+            
+            filteredProcesses.forEach(process => {
+                output += `${process.pid}\t${process.name}\t\t${process.name.length < 8 ? '\t' : ''}${process.cpu}%\t${process.memory}MB\t${process.user}\t${process.user.length < 8 ? '\t' : ''}${process.status}\n`;
+            });
+            
+            addOutput(output, 'output');
+        }
+
+        // Kill a process
+        function killProcess(args) {
+            if (args.length === 0) {
+                addOutput("Usage: kill <pid> [options]", 'error');
+                return;
+            }
+            
+            const pid = parseInt(args[0]);
+            const force = args.includes('-f') || args.includes('--force');
+            
+            const process = processes.find(p => p.pid === pid);
+            if (!process) {
+                addOutput(`Process with PID ${pid} not found`, 'error');
+                return;
+            }
+            
+            if (process.protected) {
+                addOutput(`Access denied: Process ${process.name} (${pid}) is protected`, 'error');
+                return;
+            }
+            
+            if (force) {
+                addOutput(`Force killing process ${process.name} (${pid})...`, 'warning');
+                // Simulate force kill
+                setTimeout(() => {
+                    const index = processes.findIndex(p => p.pid === pid);
+                    if (index !== -1) {
+                        processes.splice(index, 1);
+                        addOutput(`Process ${process.name} (${pid}) terminated forcefully`, 'success');
+                    }
+                }, 500);
+            } else {
+                addOutput(`Gracefully terminating process ${process.name} (${pid})...`, 'info');
+                // Simulate graceful termination
+                setTimeout(() => {
+                    const index = processes.findIndex(p => p.pid === pid);
+                    if (index !== -1) {
+                        processes[index].status = "Terminating";
+                        addOutput(`Process ${process.name} (${pid}) is shutting down...`, 'info');
+                        
+                        setTimeout(() => {
+                            processes.splice(index, 1);
+                            addOutput(`Process ${process.name} (${pid}) terminated successfully`, 'success');
+                        }, 1000);
+                    }
+                }, 500);
+            }
+        }
+
+        // Inject into a process
+        function injectIntoProcess(args) {
+            if (args.length < 2) {
+                addOutput("Usage: inject <pid> <payload>", 'error');
+                return;
+            }
+            
+            const pid = parseInt(args[0]);
+            const payload = args[1];
+            
+            const process = processes.find(p => p.pid === pid);
+            if (!process) {
+                addOutput(`Process with PID ${pid} not found`, 'error');
+                return;
+            }
+            
+            if (process.protected) {
+                addOutput(`Access denied: Process ${process.name} (${pid}) is protected`, 'error');
+                return;
+            }
+            
+            addOutput(`Preparing to inject ${payload} into process ${process.name} (${pid})...`, 'warning');
+            
+            // Simulate injection process
+            setTimeout(() => {
+                addOutput(`Allocating memory in target process...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput(`Writing payload to process memory...`, 'info');
+                    
+                    setTimeout(() => {
+                        addOutput(`Creating remote thread...`, 'info');
+                        
+                        setTimeout(() => {
+                            addOutput(`Successfully injected ${payload} into process ${process.name} (${pid})`, 'success');
+                            
+                            // Modify process to show injection
+                            if (payload === 'shellcode') {
+                                process.name += ' [SHELL]';
+                            } else if (payload === 'keylogger') {
+                                process.name += ' [KEYLOG]';
+                            } else if (payload === 'hook') {
+                                process.name += ' [HOOKED]';
+                            }
+                        }, 500);
+                    }, 500);
+                }, 500);
+            }, 500);
+        }
+
+        // Hijack a process
+        function hijackProcess(args) {
+            if (args.length === 0) {
+                addOutput("Usage: hijack <pid>", 'error');
+                return;
+            }
+            
+            const pid = parseInt(args[0]);
+            const process = processes.find(p => p.pid === pid);
+            
+            if (!process) {
+                addOutput(`Process with PID ${pid} not found`, 'error');
+                return;
+            }
+            
+            addOutput(`Attempting to hijack process ${process.name} (${pid})...`, 'warning');
+            
+            // Simulate hijacking process
+            setTimeout(() => {
+                addOutput(`Attaching debugger to process...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput(`Redirecting I/O streams...`, 'info');
+                    
+                    setTimeout(() => {
+                        addOutput(`Process ${process.name} (${pid}) hijack successful`, 'success');
+                        addOutput(`Hijacked process console ready. Type 'exit' to return.`, 'info');
+                        
+                        // Simulate hijacked console
+                        prompt.textContent = `proccat:${pid}>`;
+                        commandInput.value = '';
+                        
+                        // Store original command handler
+                        const originalHandler = commandInput.onkeydown;
+                        
+                        // Set up hijacked console handler
+                        commandInput.onkeydown = function(e) {
+                            if (e.key === 'Enter') {
+                                const cmd = commandInput.value.trim();
+                                if (cmd === 'exit') {
+                                    // Restore normal console
+                                    commandInput.onkeydown = originalHandler;
+                                    prompt.textContent = 'proccat>';
+                                    addOutput(`Disconnected from process ${pid}`, 'info');
+                                } else {
+                                    addOutput(cmd, 'command');
+                                    addOutput(`[${pid}] ${processOutput(cmd)}`, 'output');
+                                    commandInput.value = '';
+                                }
+                            }
+                        };
+                    }, 500);
+                }, 500);
+            }, 500);
+        }
+
+        // Generate realistic process output
+        function processOutput(cmd) {
+            const responses = [
+                `Command executed successfully`,
+                `Operation completed with status 0`,
+                `No errors detected`,
+                `Warning: Deprecated API call`,
+                `Error: Access denied (code 5)`,
+                `Result: ${Math.floor(Math.random() * 100)}`,
+                `Processing completed in ${Math.random().toFixed(2)}s`,
+                `Warning: Buffer overflow detected`,
+                `Error: Invalid parameter`,
+                `Debug: Breakpoint hit at 0x${Math.floor(Math.random() * 0xFFFF).toString(16)}`
+            ];
+            return responses[Math.floor(Math.random() * responses.length)];
+        }
+
+        // Copy a process
+        function copyProcess(args) {
+            if (args.length === 0) {
+                addOutput("Usage: copy <pid> [new_name]", 'error');
+                return;
+            }
+            
+            const pid = parseInt(args[0]);
+            const newName = args[1] || `copy_of_${pid}`;
+            
+            const process = processes.find(p => p.pid === pid);
+            if (!process) {
+                addOutput(`Process with PID ${pid} not found`, 'error');
+                return;
+            }
+            
+            addOutput(`Creating copy of process ${process.name} (${pid})...`, 'info');
+            
+            // Simulate copy process
+            setTimeout(() => {
+                addOutput(`Reading process memory...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput(`Allocating memory for new process...`, 'info');
+                    
+                    setTimeout(() => {
+                        // Create new process with similar properties
+                        const newPid = Math.max(...processes.map(p => p.pid)) + 1;
+                        const newProcess = {
+                            pid: newPid,
+                            name: newName,
+                            cpu: process.cpu,
+                            memory: process.memory,
+                            user: process.user,
+                            status: "Running"
+                        };
+                        
+                        processes.push(newProcess);
+                        addOutput(`Successfully created process ${newName} (${newPid})`, 'success');
+                    }, 500);
+                }, 500);
+            }, 500);
+        }
+
+        // List available devices
+        function listDevices() {
+            let output = "Device ID\tType\t\tName\t\t\tStatus\n";
+            output += "--------------------------------------------------------\n";
+            
+            devices.forEach(device => {
+                output += `${device.id}\t${device.type}\t\t${device.name}\t${device.name.length < 12 ? '\t' : ''}${device.status}\n`;
+            });
+            
+            addOutput(output, 'output');
+        }
+
+        // Connect to a device
+        function connectToDevice(args) {
+            if (args.length === 0) {
+                addOutput("Usage: connect <device_id> [options]", 'error');
+                return;
+            }
+            
+            const deviceId = args[0];
+            const device = devices.find(d => d.id === deviceId);
+            
+            if (!device) {
+                addOutput(`Device ${deviceId} not found`, 'error');
+                return;
+            }
+            
+            if (args.includes('--start')) {
+                device.status = 'on';
+                addOutput(`Started device ${device.name} (${deviceId})`, 'success');
+            } else if (args.includes('--stop')) {
+                device.status = 'off';
+                addOutput(`Stopped device ${device.name} (${deviceId})`, 'success');
+            } else if (args.includes('--stream')) {
+                const target = args[args.indexOf('--stream') + 1];
+                if (!target) {
+                    addOutput("Stream target not specified", 'error');
+                    return;
+                }
+                
+                addOutput(`Streaming ${device.type} data to ${target}...`, 'warning');
+                device.status = `streaming to ${target}`;
+                
+                // Simulate streaming
+                setTimeout(() => {
+                    addOutput(`Stream established. Data rate: ${Math.floor(Math.random() * 5000)} kbps`, 'info');
+                }, 1000);
+            } else {
+                addOutput(`Connected to device ${device.name} (${deviceId})`, 'success');
+            }
+        }
+
+        // Dump process memory
+        function dumpMemory(args) {
+            if (args.length === 0) {
+                addOutput("Usage: dump <pid>", 'error');
+                return;
+            }
+            
+            const pid = parseInt(args[0]);
+            const process = processes.find(p => p.pid === pid);
+            
+            if (!process) {
+                addOutput(`Process with PID ${pid} not found`, 'error');
+                return;
+            }
+            
+            addOutput(`Dumping memory for process ${process.name} (${pid})...`, 'warning');
+            
+            // Simulate memory dump
+            setTimeout(() => {
+                addOutput(`Scanning process memory regions...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput(`Found ${Math.floor(Math.random() * 50) + 10} memory regions`, 'info');
+                    
+                    setTimeout(() => {
+                        // Generate realistic memory dump output
+                        let dumpOutput = `Memory dump for ${process.name} (${pid}):\n`;
+                        dumpOutput += "Address\t\tSize\tProtection\tContent\n";
+                        dumpOutput += "------------------------------------------------\n";
+                        
+                        for (let i = 0; i < 15; i++) {
+                            const address = `0x${Math.floor(Math.random() * 0xFFFFF).toString(16).padStart(8, '0')}`;
+                            const size = `${Math.floor(Math.random() * 1024) + 1}KB`;
+                            const protections = ['R--', 'RW-', 'R-X', 'RWX'];
+                            const protection = protections[Math.floor(Math.random() * protections.length)];
+                            
+                            // Generate random hex data
+                            let content = '';
+                            for (let j = 0; j < 8; j++) {
+                                content += Math.floor(Math.random() * 0xFF).toString(16).padStart(2, '0') + ' ';
+                            }
+                            content = content.trim() + '...';
+                            
+                            dumpOutput += `${address}\t${size}\t${protection}\t${content}\n`;
+                        }
+                        
+                        addOutput(dumpOutput, 'output');
+                        addOutput(`Memory dump completed. Saved to dump_${pid}.mem`, 'success');
+                    }, 500);
+                }, 500);
+            }, 500);
+        }
+
+        // List loaded modules
+        function listModules(args) {
+            if (args.length === 0) {
+                addOutput("Usage: modules <pid>", 'error');
+                return;
+            }
+            
+            const pid = parseInt(args[0]);
+            const process = processes.find(p => p.pid === pid);
+            
+            if (!process) {
+                addOutput(`Process with PID ${pid} not found`, 'error');
+                return;
+            }
+            
+            // Simulate module list
+            const modules = [
+                { name: "ntdll.dll", base: "0x7ffa0000", size: "1.5MB", path: "C:\\Windows\\System32\\ntdll.dll" },
+                { name: "kernel32.dll", base: "0x7ffb0000", size: "1.2MB", path: "C:\\Windows\\System32\\kernel32.dll" },
+                { name: "user32.dll", base: "0x7ffc0000", size: "2.1MB", path: "C:\\Windows\\System32\\user32.dll" },
+                { name: "gdi32.dll", base: "0x7ffd0000", size: "900KB", path: "C:\\Windows\\System32\\gdi32.dll" },
+                { name: "advapi32.dll", base: "0x7ffe0000", size: "800KB", path: "C:\\Windows\\System32\\advapi32.dll" },
+                { name: "msvcrt.dll", base: "0x7fff0000", size: "700KB", path: "C:\\Windows\\System32\\msvcrt.dll" },
+                { name: "shell32.dll", base: "0x80000000", size: "3.5MB", path: "C:\\Windows\\System32\\shell32.dll" },
+                { name: "ole32.dll", base: "0x80010000", size: "1.8MB", path: "C:\\Windows\\System32\\ole32.dll" }
+            ];
+            
+            // Add some process-specific modules
+            if (process.name.includes("chrome")) {
+                modules.push(
+                    { name: "chrome.dll", base: "0x12340000", size: "25MB", path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.dll" },
+                    { name: "blink_engine.dll", base: "0x23450000", size: "18MB", path: "C:\\Program Files\\Google\\Chrome\\Application\\blink_engine.dll" }
+                );
+            } else if (process.name.includes("spotify")) {
+                modules.push(
+                    { name: "spotify_audio.dll", base: "0x34560000", size: "12MB", path: "C:\\Users\\user1\\AppData\\Roaming\\Spotify\\spotify_audio.dll" },
+                    { name: "spotify_ui.dll", base: "0x45670000", size: "15MB", path: "C:\\Users\\user1\\AppData\\Roaming\\Spotify\\spotify_ui.dll" }
+                );
+            }
+            
+            let output = `Loaded modules for ${process.name} (${pid}):\n`;
+            output += "Base Address\tSize\tName\t\t\tPath\n";
+            output += "------------------------------------------------------------\n";
+            
+            modules.forEach(mod => {
+                output += `${mod.base}\t${mod.size}\t${mod.name}\t${mod.name.length < 8 ? '\t' : ''}${mod.path}\n`;
+            });
+            
+            addOutput(output, 'output');
+        }
+
+        // Run a script
+        function runScript(args) {
+            if (args.length === 0) {
+                addOutput("Usage: script <filename>", 'error');
+                return;
+            }
+            
+            const filename = args[0];
+            addOutput(`Executing script ${filename}...`, 'info');
+            
+            // Simulate script execution
+            setTimeout(() => {
+                addOutput(`Parsing script...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput(`Running script commands...`, 'info');
+                    
+                    // Simulate script output
+                    setTimeout(() => {
+                        addOutput(`[SCRIPT] Scanning system processes...`, 'output');
+                        
+                        setTimeout(() => {
+                            addOutput(`[SCRIPT] Found ${processes.length} running processes`, 'output');
+                            
+                            setTimeout(() => {
+                                addOutput(`[SCRIPT] Analyzing process tree...`, 'output');
+                                
+                                setTimeout(() => {
+                                    addOutput(`[SCRIPT] Script completed successfully`, 'success');
+                                    addOutput(`Script ${filename} execution finished`, 'info');
+                                }, 500);
+                            }, 500);
+                        }, 500);
+                    }, 500);
+                }, 500);
+            }, 500);
+        }
+
+        // Clear terminal
+        function clearTerminal() {
+            terminal.innerHTML = '';
+            printWelcomeMessage();
+        }
+
+        // Add output to terminal
+        function addOutput(text, type) {
+            const line = document.createElement('div');
+            line.className = type;
+            line.textContent = text;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    </script>
+</body>
+</html>

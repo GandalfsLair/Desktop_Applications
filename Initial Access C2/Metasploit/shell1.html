@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HackerTyper</title>
+<!--    <link rel="stylesheet" href="styles.css">-->
+<style>
+
+body {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.window {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid black;
+}
+
+
+#top-right {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    color: #0f0;
+    font-family: monospace;
+    padding: 10px;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+.popup {
+    position: fixed;
+    top: 13%;
+    left: 80%;
+    transform: translate(-50%, -50%);
+    background-color: red;
+    color: black;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 18px;
+    font-family: monospace;
+    font-weight: bold;
+    display: none; /* Hidden by default, only shown when triggered */
+    z-index: 1000; /* Make sure the popup is on top of the content */
+}
+
+/* Ensuring the text container doesn't overlap the popup */
+#typer-output {
+    position: absolute; /* Needed for precise positioning */
+    top: 0; /* Position at the top */
+    left: 0; /* Position at the left */
+    white-space: pre-wrap; /* Preserve whitespace and wrap text */
+}
+
+
+
+
+</style>
+</head>
+<body>
+
+<div class="window" id="top-right">
+    <div id="popup" class="popup"></div>
+    <pre id="typer-output"></pre>
+</div>
+
+<script>
+
+let codeContent = "";
+let fileIndex = 0;
+let isAutoScrolling = false;
+let autoScrollInterval;
+
+// Load the text file once
+fetch("code.txt")
+  .then(response => response.text())
+  .then(data => {
+    codeContent = data.trim();
+  })
+  .catch(err => console.error("Error loading code.txt:", err));
+
+document.addEventListener("keydown", function (event) {
+  // Handle hotkeys (1-0) for pop-ups
+  if ("1234567890".includes(event.key)) {
+    showPopup(event.key);
+    return;
+  }
+
+  // Handle Escape key to close pop-ups
+  if (event.key === "Escape") {
+    hidePopup();
+    return;
+  }
+
+  // Toggle auto-scrolling with Enter key
+  if (event.key === "Enter") {
+    if (isAutoScrolling) {
+      clearInterval(autoScrollInterval);
+      isAutoScrolling = false;
+    } else {
+      isAutoScrolling = true;
+      autoScrollInterval = setInterval(() => {
+        typeCharacter();
+      }, 50); // Adjust speed as needed. Lower number = Faster
+    }
+    return;
+  }
+
+  // If auto-scrolling is active, ignore manual typing
+  if (isAutoScrolling) return;
+
+  // Handle manual typing
+  if (![" ", "["].includes(event.key)) {
+    typeCharacter();
+  }
+});
+
+function typeCharacter() {
+  if (fileIndex < codeContent.length) {
+    document.getElementById("typer-output").textContent += codeContent[fileIndex++];
+    document.getElementById("top-right").scrollTop = document.getElementById("top-right").scrollHeight;
+  } else {
+    // Stop auto-scrolling if we reach the end
+    clearInterval(autoScrollInterval);
+    isAutoScrolling = false;
+  }
+}
+//EXPLOIT Responses
+function showPopup(key) {
+  const messages = {
+    "1": "FIREWALL: Bypass (True)",
+    "2": "FIREWALL: Evade (True)",
+    "3": "FIREWALL: False {Type MisMatch?}",
+    "4": "AV: Bypass (True)",
+    "5": "AV: Evade (True)",
+    "6": "AV: False {Type MisMatch}",
+    "7": "FIREWALL: Data Error?",
+    "8": "AV: Data Error?",
+    "9": "COMPILATION: [True]",
+    "0": "COMPILATION: [False]",
+  };
+  document.getElementById("popup").textContent = messages[key] || "ALERT: Unknown error!";
+  document.getElementById("popup").style.display = "block";
+}
+
+function hidePopup() {
+  document.getElementById("popup").style.display = "none";
+}
+
+
+</script>
+
+
+
+<!--<script type="module" src="typer.js"></script>-->
+
+</body>
+</html>

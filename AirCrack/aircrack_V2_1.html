@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aircrack-ng Simulator</title>
+  <style>
+    /* Terminal styling */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: black;
+      color: #00ff00; /* Classic terminal green */
+      font-family: "Courier New", Courier, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .terminal {
+      width: 90%;
+      height: 80%;
+      max-width: 1000px;
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      color: #00ff00;
+      border-bottom: 1px solid #00ff00;
+      padding-bottom: 5px;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    .output {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      white-space: pre-wrap; /* Preserve formatting */
+    }
+    .input-line {
+      display: flex;
+      align-items: center;
+    }
+    .prompt {
+      color: #00ff00;
+      margin-right: 5px;
+    }
+    .user-input {
+      background: transparent;
+      border: none;
+      color: #00ff00;
+      outline: none;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 1rem;
+      width: 100%;
+    }
+    /* Scrollbar styling */
+    .output::-webkit-scrollbar {
+      width: 8px;
+    }
+    .output::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+    .output::-webkit-scrollbar-thumb {
+      background-color: #00ff00;
+      border-radius: 4px;
+    }
+    /* Color coding for different message types */
+    .success {
+      color: #00ff00;
+    }
+    .error {
+      color: #ff0000;
+    }
+    .warning {
+      color: #ffff00;
+    }
+    .info {
+      color: #00ffff;
+    }
+    .highlight {
+      color: #ff00ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="terminal">
+    <div class="header">Aircrack-ng Suite v1.6</div>
+    <div id="output" class="output"></div>
+    <div class="input-line">
+      <span class="prompt">aircrack$ </span>
+      <input type="text" id="userInput" class="user-input" autofocus />
+    </div>
+  </div>
+
+  <script>
+    // Initialize with welcome message
+    document.addEventListener('DOMContentLoaded', function() {
+      appendOutput("Aircrack-ng 1.6 - (C) 2006-2020 Thomas d'Otreppe");
+      appendOutput("https://www.aircrack-ng.org");
+      appendOutput("");
+      appendOutput("Commands: airodump-ng, aireplay-ng, aircrack-ng, airmon-ng, help");
+      appendOutput("Type 'help' for available commands");
+      appendOutput("");
+    });
+
+    // Event listener for user input
+    document.getElementById('userInput').addEventListener('keypress', function(event) {
+      if (event.key === 'Enter') {
+        const userInput = event.target.value.trim();
+        event.target.value = ''; // Clear input
+        appendOutput(`aircrack$ ${userInput}`);
+        processCommand(userInput);
+      }
+    });
+
+    /**
+     * Main command processing function
+     * @param {string} command - The full command entered by user
+     */
+    function processCommand(command) {
+      // Split command into parts
+      const parts = command.split(/\s+/);
+      const baseCommand = parts[0].toLowerCase();
+      
+      // Clear command (non-standard but useful for demo)
+      if (baseCommand === 'clear') {
+        clearOutput();
+        return;
+      }
+      
+      // Help command
+      if (baseCommand === 'help') {
+        showHelp();
+        return;
+      }
+      
+      // Route to appropriate command handler
+      switch(baseCommand) {
+        case 'airmon-ng':
+          handleAirmonNg(parts.slice(1));
+          break;
+        case 'airodump-ng':
+          handleAirodumpNg(parts.slice(1));
+          break;
+        case 'aireplay-ng':
+          handleAireplayNg(parts.slice(1));
+          break;
+        case 'aircrack-ng':
+          handleAircrackNg(parts.slice(1));
+          break;
+        default:
+          appendOutput(`Unknown command: ${baseCommand}`, 'error');
+          appendOutput("Type 'help' for available commands");
+      }
+    }
+
+    /**
+     * Displays help information
+     */
+    function showHelp() {
+      appendOutput("Available commands:", 'info');
+      appendOutput("------------------", 'info');
+      appendOutput("airmon-ng start [interface] - Put interface in monitor mode");
+      appendOutput("airmon-ng stop [interface]  - Take interface out of monitor mode");
+      appendOutput("airodump-ng [interface]     - Capture WiFi packets");
+      appendOutput("airodump-ng --bssid [BSSID] -c [channel] [interface] - Target specific AP");
+      appendOutput("aireplay-ng --deauth [count] -a [BSSID] [interface] - Deauthenticate clients");
+      appendOutput("aircrack-ng [capture file]  - Crack WEP/WPA keys");
+      appendOutput("aircrack-ng -w [wordlist] [capture file] - Crack with wordlist");
+      appendOutput("clear                       - Clear screen");
+      appendOutput("help                        - Show this help");
+    }
+
+    /**
+     * Handles airmon-ng commands
+     * @param {array} args - Command arguments
+     */
+    function handleAirmonNg(args) {
+      if (args.length < 1) {
+        appendOutput("Usage: airmon-ng <start|stop> [interface]", 'error');
+        return;
+      }
+      
+      const action = args[0].toLowerCase();
+      const interface = args.length > 1 ? args[1] : 'wlan0';
+      
+      switch(action) {
+        case 'start':
+          simulateDelay(() => {
+            appendOutput(`Enabling monitor mode on ${interface}...`, 'info');
+            simulateDelay(() => {
+              appendOutput(`Interface ${interface} set to monitor mode (mon0)`, 'success');
+              appendOutput(`New interface created: mon0`, 'success');
+            });
+          });
+          break;
+        case 'stop':
+          simulateDelay(() => {
+            appendOutput(`Disabling monitor mode on ${interface}...`, 'info');
+            simulateDelay(() => {
+              appendOutput(`Interface ${interface} returned to managed mode`, 'success');
+            });
+          });
+          break;
+        case 'check':
+          simulateDelay(() => {
+            appendOutput("Checking for interfering processes...", 'info');
+            simulateDelay(() => {
+              appendOutput("Found 0 processes that could interfere.", 'success');
+            });
+          });
+          break;
+        default:
+          appendOutput(`Unknown airmon-ng action: ${action}`, 'error');
+      }
+    }
+
+    /**
+     * Handles airodump-ng commands
+     * @param {array} args - Command arguments
+     */
+    function handleAirodumpNg(args) {
+      // Check if targeting specific BSSID
+      const bssidIndex = args.indexOf('--bssid');
+      if (bssidIndex >= 0) {
+        if (args.length < bssidIndex + 4) {
+          appendOutput("Usage: airodump-ng --bssid [BSSID] -c [channel] [interface]", 'error');
+          return;
+        }
+        
+        const bssid = args[bssidIndex + 1];
+        const channel = args[args.indexOf('-c') + 1];
+        const interface = args[args.length - 1];
+        
+        targetSpecificAP(bssid, channel, interface);
+        return;
+      }
+      
+      // Default scan all networks
+      if (args.length < 1) {
+        appendOutput("Usage: airodump-ng [interface]", 'error');
+        return;
+      }
+      
+      const interface = args[0];
+      scanAllNetworks(interface);
+    }
+
+    /**
+     * Simulates scanning all nearby networks
+     * @param {string} interface - Network interface
+     */
+    function scanAllNetworks(interface) {
+      appendOutput(`Starting capture on ${interface}...`, 'info');
+      
+      simulateDelay(() => {
+        appendOutput("");
+        appendOutput(" CH 11 ][ Elapsed: 12 s ][ 2024-04-03 14:30 ", 'highlight');
+        appendOutput("");
+        appendOutput(" BSSID              PWR  Beacons  #Data  CH  MB   ENC  CIPHER AUTH ESSID", 'info');
+        appendOutput("");
+        appendOutput(" 12:34:56:78:90:AB  -42    105     43    6  540  WPA2 CCMP   PSK  HomeWiFi");
+        appendOutput(" AA:BB:CC:DD:EE:FF  -58     92     12    11 130  WPA  TKIP   PSK  CoffeeShop");
+        appendOutput(" 11:22:33:44:55:66  -67     75      5    1  270  WEP  WEP    OPN  OldNetwork");
+        appendOutput(" 55:66:77:88:99:00  -72     63      8    6  130  WPA2 CCMP   PSK  OfficeNet");
+        appendOutput("");
+        appendOutput(" BSSID              STATION            PWR   Rate    Lost  Frames  Probe");
+        appendOutput("");
+        appendOutput(" 12:34:56:78:90:AB  00:11:22:33:44:55  -42   1e- 1e     0       45");
+        appendOutput(" AA:BB:CC:DD:EE:FF  A1:B2:C3:D4:E5:F6   -58   1e- 1e     2       12");
+        appendOutput("");
+        appendOutput("Press Ctrl+C to stop scanning...");
+      });
+    }
+
+    /**
+     * Simulates targeting a specific access point
+     * @param {string} bssid - MAC address of AP
+     * @param {string} channel - WiFi channel
+     * @param {string} interface - Network interface
+     */
+    function targetSpecificAP(bssid, channel, interface) {
+      appendOutput(`Targeting BSSID: ${bssid} on channel ${channel}`, 'info');
+      appendOutput(`Using interface: ${interface}`, 'info');
+      
+      simulateDelay(() => {
+        appendOutput("");
+        appendOutput(` CH ${channel} ][ Elapsed: 5 s ][ 2024-04-03 14:35 ][ WPA handshake: ${bssid} `, 'highlight');
+        appendOutput("");
+        appendOutput(" BSSID              PWR  Beacons  #Data  CH  MB   ENC  CIPHER AUTH ESSID", 'info');
+        appendOutput("");
+        appendOutput(` ${bssid}  -42    105     43    ${channel}  540  WPA2 CCMP   PSK  HomeWiFi`);
+        appendOutput("");
+        appendOutput(" BSSID              STATION            PWR   Rate    Lost  Frames  Probe");
+        appendOutput("");
+        appendOutput(` ${bssid}  00:11:22:33:44:55  -42   1e- 1e     0       45`);
+        appendOutput(` ${bssid}  AA:BB:CC:DD:EE:FF  -45   1e- 1e     2       12`);
+        appendOutput("");
+        appendOutput(`[WPA handshake: ${bssid}]`, 'success');
+        appendOutput("");
+        appendOutput("Saving capture to capture-01.cap");
+        appendOutput("Press Ctrl+C to stop capture...");
+      });
+    }
+
+    /**
+     * Handles aireplay-ng commands
+     * @param {array} args - Command arguments
+     */
+    function handleAireplayNg(args) {
+      if (args.length < 1) {
+        appendOutput("Usage: aireplay-ng <options> [interface]", 'error');
+        return;
+      }
+      
+      // Check for deauth attack
+      const deauthIndex = args.indexOf('--deauth');
+      if (deauthIndex >= 0) {
+        if (args.length < deauthIndex + 4) {
+          appendOutput("Usage: aireplay-ng --deauth [count] -a [BSSID] [interface]", 'error');
+          return;
+        }
+        
+        const count = args[deauthIndex + 1];
+        const bssid = args[args.indexOf('-a') + 1];
+        const interface = args[args.length - 1];
+        
+        performDeauthAttack(count, bssid, interface);
+        return;
+      }
+      
+      appendOutput(`Unknown aireplay-ng option: ${args[0]}`, 'error');
+    }
+
+    /**
+     * Simulates a deauthentication attack
+     * @param {string} count - Number of deauth packets
+     * @param {string} bssid - MAC address of AP
+     * @param {string} interface - Network interface
+     */
+    function performDeauthAttack(count, bssid, interface) {
+      appendOutput(`Starting deauthentication attack on ${bssid}`, 'warning');
+      appendOutput(`Sending ${count} deauth packets via ${interface}`, 'warning');
+      
+      let packetsSent = 0;
+      const totalPackets = parseInt(count);
+      const interval = setInterval(() => {
+        packetsSent += 10;
+        if (packetsSent >= totalPackets) {
+          clearInterval(interval);
+          appendOutput(`Sent ${totalPackets} deauth packets to ${bssid}`, 'success');
+          appendOutput("Attack completed successfully", 'success');
+        } else {
+          appendOutput(`Sending deauth to ${bssid} - ${packetsSent}/${totalPackets}`, 'info');
+        }
+      }, 500);
+    }
+
+    /**
+     * Handles aircrack-ng commands
+     * @param {array} args - Command arguments
+     */
+    function handleAircrackNg(args) {
+      if (args.length < 1) {
+        appendOutput("Usage: aircrack-ng [options] <capture file>", 'error');
+        return;
+      }
+      
+      // Check for wordlist attack
+      const wordlistIndex = args.indexOf('-w');
+      if (wordlistIndex >= 0) {
+        if (args.length < wordlistIndex + 3) {
+          appendOutput("Usage: aircrack-ng -w [wordlist] [capture file]", 'error');
+          return;
+        }
+        
+        const wordlist = args[wordlistIndex + 1];
+        const captureFile = args[args.length - 1];
+        
+        crackWithWordlist(wordlist, captureFile);
+        return;
+      }
+      
+      // Default WEP crack
+      const captureFile = args[args.length - 1];
+      crackWEP(captureFile);
+    }
+
+    /**
+     * Simulates cracking WEP encryption
+     * @param {string} captureFile - Capture file name
+     */
+    function crackWEP(captureFile) {
+      appendOutput(`Opening ${captureFile}...`, 'info');
+      appendOutput("Read 12543 packets.", 'info');
+      
+      simulateDelay(() => {
+        appendOutput("");
+        appendOutput(" #  BSSID              ESSID         Encryption", 'info');
+        appendOutput("");
+        appendOutput(" 1  12:34:56:78:90:AB  HomeWiFi      WEP (IVs: 54321)", 'info');
+        appendOutput("");
+        appendOutput("Choosing first network as target.", 'info');
+        
+        simulateDelay(() => {
+          appendOutput("Starting PTW attack with 54321 IVs.", 'info');
+          
+          // Simulate cracking progress
+          let progress = 0;
+          const interval = setInterval(() => {
+            progress += Math.floor(Math.random() * 5) + 1;
+            if (progress >= 100) {
+              clearInterval(interval);
+              appendOutput("");
+              appendOutput("KEY FOUND! [ HomeWiFi: 12:34:56:78:90 ]", 'highlight');
+              appendOutput("Decrypted correctly: 100%", 'success');
+            } else {
+              appendOutput(`[${progress}%] ${generateRandomHex(8)} keys tested`, 'info');
+            }
+          }, 300);
+        });
+      });
+    }
+
+    /**
+     * Simulates cracking with a wordlist
+     * @param {string} wordlist - Wordlist file name
+     * @param {string} captureFile - Capture file name
+     */
+    function crackWithWordlist(wordlist, captureFile) {
+      appendOutput(`Opening ${captureFile}...`, 'info');
+      appendOutput("Read 12543 packets.", 'info');
+      appendOutput(`Using wordlist: ${wordlist}`, 'info');
+      
+      simulateDelay(() => {
+        appendOutput("");
+        appendOutput(" #  BSSID              ESSID         Encryption", 'info');
+        appendOutput("");
+        appendOutput(" 1  12:34:56:78:90:AB  HomeWiFi      WPA2 (1 handshake)", 'info');
+        appendOutput("");
+        appendOutput("Starting dictionary attack. Please wait...", 'info');
+        
+        // Simulate wordlist cracking
+        let keysTested = 0;
+        const totalKeys = 983042;
+        const interval = setInterval(() => {
+          keysTested += Math.floor(Math.random() * 5000) + 1000;
+          if (keysTested >= totalKeys * 0.9) {
+            clearInterval(interval);
+            simulateDelay(() => {
+              appendOutput("");
+              appendOutput("KEY FOUND! [ HomeWiFi : securepassword123 ]", 'highlight');
+              appendOutput("Master Key: A1B2C3D4E5F6...", 'info');
+              appendOutput("Transient Key: 11:22:33:44:55...", 'info');
+            });
+          } else {
+            const rate = Math.floor(Math.random() * 200) + 500;
+            appendOutput(`[00:0${Math.floor(keysTested/100000)}:${Math.floor((keysTested%100000)/1000)}] ${keysTested}/${totalKeys} keys tested (${rate} k/s)`, 'info');
+            appendOutput(`Current passphrase: "${generateRandomWord()}"`, 'info');
+          }
+        }, 800);
+      });
+    }
+
+    /**
+     * Helper function to generate random hex strings
+     * @param {number} length - Length of hex string
+     * @returns {string} Random hex string
+     */
+    function generateRandomHex(length) {
+      const chars = '0123456789ABCDEF';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    /**
+     * Helper function to generate random words
+     * @returns {string} Random word
+     */
+    function generateRandomWord() {
+      const words = [
+        'password', 'secure', 'wifi123', 'letmein', 'admin', '123456', 
+        'qwerty', 'monkey', 'sunshine', 'password1', 'trustno1'
+      ];
+      const suffixes = ['', '123', '!', '@', '1234', '?', '1'];
+      
+      const word = words[Math.floor(Math.random() * words.length)];
+      const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+      
+      return word + suffix;
+    }
+
+    /**
+     * Appends text to output with optional class
+     * @param {string} text - Text to display
+     * @param {string} className - CSS class for styling (optional)
+     */
+    function appendOutput(text, className = '') {
+      const outputDiv = document.getElementById('output');
+      const line = document.createElement('div');
+      line.textContent = text;
+      if (className) line.className = className;
+      outputDiv.appendChild(line);
+      outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+
+    /**
+     * Clears the output screen
+     */
+    function clearOutput() {
+      document.getElementById('output').innerHTML = '';
+    }
+
+    /**
+     * Simulates processing delay
+     * @param {function} callback - Function to call after delay
+     * @param {number} min - Minimum delay in ms (default 500)
+     * @param {number} max - Maximum delay in ms (default 2000)
+     */
+    function simulateDelay(callback, min = 500, max = 2000) {
+      setTimeout(callback, Math.random() * (max - min) + min);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,527 @@
+Network Mapper
+
+What is it?
+
+Network Mapper is an attempt to create a Hollywood Hacking version of the nMap tool.
+This is a wildly popular network scanning utility with multiple functions and abilities.
+
+What can it do?
+
+It is essentially programmed to accept commands and spit out an output.
+What this means is that it will need to be tailored to the specific use by the user. 
+
+
+
+STRUCTURE OF USE
+	Commands
+		> nmap (COMMAND)
+	Flags
+		> nmap [-FLAG] {IP Address}
+	Scripts
+		> nmap <--script=#SCRIPT_NAME#> {IP Address}
+
+COMMANDS
+
+All commands must start 'nmap' with a space followed by;
+
+clear -- Clears the terminal window
+store -- Saves data to designated SHARED storage area
+save -- Saves data to designated PRIVATE storage area
+
+FLAGS
+
+All commands must start 'nmap' with a space followed by;
+
+-sP - runPingScan(target);
+
+-O - runOSDetection(target);
+
+-p - Port Scan
+        // For port scan, you might expect the next token to be the ports list.
+        // You can design the parser to capture that as well.
+        // For simplicity, let's assume '-p' is combined with ports in a different format.
+        runPortScan([flag], target);  // Pass an array with flag if needed.
+
+-A - runAggressiveScan(target);
+
+-sV - runServiceScan(target);
+
+-sV_NoTrace - Runs a Service Scan but TraceRoute is disabled
+
+-D - runFirewallEvasion(target);
+
+--spoof-mac - 
+        // Here, you might expect another token for the MAC address.
+        // You could extend the logic to handle that.
+        runMacSpoofing([flag], target);
+        break;
+
+-m - runMACAddressScan(target);
+
+-prox - Run scan traffic via named proxy servers
+
+-prox_logs - Run scan traffic via named proxy servers. Delete proxy logs afterwards
+
+
+SCRIPTS
+
+All scripts must start 'nmap' followed by
+
+--script=vuln - runVulnerabilityDetection(target); 
+
+--script=banner - Grabs service banners 
+
+--script=dll_vuln - Lists vulnerable Data Link Libraries
+        
+--script=ms_sql - Scans for SQL servers
+       
+--script=sess_enum - Scans for vulnerable sessions
+
+--script=dirb - Scans for vulberable URI and/or Path data (As per a Dirb or GoBuster scan)
+        
+--script=proc - Scans for running processes [Set for running EXE's])
+
+
+
+COMMANDS, OUTPUTS, and RESULTS 
+
+COMMAND - nmap ${target}
+
+OUTPUT
+
+Starting Nmap scan on ${target}...
+Scan complete. Found open ports: 22, 80, 443
+Nmap scan report for ${target}
+Host is up (0.0012s latency)
+- - - 
+
+RESULTS
+Basic scan - Gives you open ports, and whether device is 'Up' (open and waiting for input), 'Down' (unavailable), on target IP address.
+
+
+COMMAND - nmap -sP ${target}
+
+OUTPUT
+
+Starting Ping Scan on ${target}...
+Host ${target} is up. (0.0023s latency)
+- - -
+
+RESULTS
+Ping Scan - Gives you whether device is 'Up' (open and waiting for input), 'Down' (unavailable), on target IP address.
+
+
+COMMAND - nmap -O $(target)
+
+OUTPUT
+
+Performing OS Detection on ${target}...
+OS detection for ${target}: Linux Kernel 5.4 (Ubuntu)
+- - -
+
+RESULTS
+Gives you the Operating System on the target IP
+
+
+COMMAND - Nmap -p ${target}
+
+OUTPUT
+
+Scanning ports on ${target}...
+22/tcp open http
+80/tcp open http
+443/tcp open https
+- - -
+
+RESULTS
+Port Scan - Gives you open ports 
+Gives;
+Port Number/Transport Protocol being used | State of port | Protocol/Service running on port
+
+
+COMMAND - nmap -A ${target}
+
+OUTPUT
+
+Performing Aggressive Scan on ${target}...
+OS: Linux Kernel 5.4 (Ubuntu)
+22/tcp open ssh OpenSSH 8.4p1
+80/tcp open http Apache 2.4.41
+Traceroute: LocalHost -> ${target}
+- - -
+
+RESULT
+Aggressive Scan - Gives;
+Operating System with Version Number 
+Open Ports
+Port Number/Transport Protocol being used | State of port | Protocol running on port | Service running on port | Version Number
+TraceRoute of Packets
+
+
+COMMAND - nmap -sV ${target}
+
+OUTPUT
+
+Performing Service Scan on ${target}...
+22/tcp open ssh OpenSSH 8.4p1
+80/tcp open http Apache 2.4.41
+Traceroute: LocalHost -> ${target}
+- - -
+
+RESULT
+Service Scan - Gives;
+Open Ports
+Port Number/Transport Protocol being used | State of port | Protocol running on port | Service running on port | Version Number
+TraceRoute of Packets
+
+
+COMMAND - nmap -sV_NoTrace ${target}
+
+OUTPUT
+
+Performing Service Scan on ${target}...
+OS: Linux Kernel 5.4 (Ubuntu)
+22/tcp open ssh OpenSSH 8.4p1
+80/tcp open http Apache 2.4.41
+Traceroute: DISABLED!
+- - -
+
+RESULTS
+Service Scan with TraceRoute disabled - Gives;
+Open Ports
+Port Number/Transport Protocol being used | State of port | Protocol running on port | Service running on port | Version Number
+Trace Route is automatically disabled
+
+
+COMMAND - nmap -Fd ${target}
+
+OUTOUT (If Negative)
+
+Running Decoy Scan on ${target} using random decoys...
+Using random decoys: 137.0.113.5, 198.51.100.23, 192.0.2.10
+Scan complete. Target: ${target} - No Firewall detected.
+- - -
+
+RESULTS
+Firewall Scan with Decoy IP Addresses. IP addresses are hard coded.
+Gives presence or not of firewall on target IP address.
+If Positive - Gives Make, Model, MAC Address, and Other Data on firewall.
+
+
+COMMAND - nmap -Fe ${target}
+
+OUTOUT (If Positive)
+
+Running Firewall Scan on ${target}...
+Scan complete. Target: ${target} - Firewall detected.
+- - -
+Firewall Make:
+Firewall Model:
+Firewall MAC:
+- - -
+
+RESULTS
+Firewall Scan giving presence or not of firewall on target IP address.
+If Positive - Gives Make, Model, MAC Address, and Other Data on firewall.
+
+
+
+
+
+
+
+
+SCRIPTS
+
+COMMAND - nmap --script=banners
+
+OUTPUT
+
+Running Banner Grabber on ${target}...
+22/tcp open ssh OpenSSH 8.4.1
+80/tcp open http Apache 2.4.41
+- - -
+
+RESULTS
+Identifies services running on open ports.
+Lists;
+	Port number being scanned
+	Transport protocol being used
+	State of the port
+	Service/Protocol running on the port
+	Name of service
+	Version of service
+
+
+COMMAND - nmap --spoof-mac-t
+
+OUTPUT
+
+Spoofing MAC address for ${target}...
+Using MAC Address: 00:11:22:33:44:55 (Fake Vendor)
+MAC address spoofing complete.
+MAC address reset to original.
+- - -
+
+RESULTS
+* Command may need to be added to!
+
+MAC Address Spoofing - Adds a specific named MAC Address to a given probe or scan
+MAC Address is then reset to the original 
+
+
+COMMAND - nmap --spoof-mac-p
+
+OUTPUT
+
+Spoofing MAC address for ${target}...
+Using MAC Address: 00:11:22:33:44:55 (Fake Vendor)
+MAC address spoofing complete.
+New MAC address set for further communications.
+- - -
+
+RESULTS
+* Command may need to be added to!
+
+MAC Address Spoofing - Adds a specific named MAC Address to a given probe or scan
+MAC Address is then kept for future sessions.
+
+
+COMMAND - nmap --reset-mac (Identifier)
+
+OUTPUT
+
+Resetting MAC address to Original...`);
+- - -
+MAC Address resetting.
+- - -
+MAC Address reset complete.
+- - -
+
+RESULTS
+* Command may need to be added to!
+
+MAC Address is reset to the original. 
+*Requires a third piece of information to the added into the command.
+Could be an IP address if proxying via a compromised host?
+Could be LocalHost if used on home device?
+
+
+
+
+
+function runProxy(target) {
+  // This is a placeholder; you could parse the MAC address from flagParts if provided.
+  displayOutput(`Scan target:${target}...`);
+  displayOutput(`Proxy Server Connection: True`);
+  simulateScanDelay(() => {
+    displayOutput(`Connection proxy: LocalHost -> 38.41.10.12 -> 188.210.48.210 -> ${target}`);
+    displayOutput(`Proxy server complete.`);
+    displayOutput(`Reset to default.`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runProxyLog(target) {
+    displayOutput(`Scan target:${target}...`);
+    displayOutput(`Proxy Server Connection: True`);
+    simulateScanDelay(() => {
+        displayOutput(`Connection proxy: LocalHost -> 38.41.10.12 -> 188.210.48.210 -> ${target}`);
+        displayOutput(`Proxy server complete.`);
+        displayOutput(`Reset to default.`);
+        simulateScanDelay(() => {
+            displayOutput(`Accessing logs: 188.210.48.210`);
+            displayOutput(`Log erase - 188.210.48.210 - running`);
+            displayOutput(`Log erase - 188.210.48.210 - complete`);
+            simulateScanDelay(() => {
+                displayOutput(`Accessing logs: 38.41.10.12`);
+                displayOutput(`Log erase - 38.41.10.12 - running`);
+                displayOutput(`Log erase - 38.41.10.12 - complete`);
+                simulateScanDelay(() => {
+                  displayOutput(`Logs erased.`);
+                  displayOutput(` - - - `);
+            }); // Closing brace for innermost simulateScanDelay
+        }); // Closing brace for second simulateScanDelay
+    }); // Closing brace for outermost simulateScanDelay
+  });
+}
+
+function runVulnerabilityDetection(target) {
+  displayOutput(`Scanning for vulnerabilities on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`PORT   STATE  SERVICE  VERSION`);
+    displayOutput(`445/tcp open smb Microsoft Windows SMBv1`);
+    displayOutput(`VULNERABLE: MS17-010: Remote Code Execution Vulnerability (EternalBlue)`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runVulnerableDLL(target) {
+  displayOutput(`Scanning for vulnerable Data Link Libraries on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`Kernel32.dll/Win_Sys_Sec - 0.2.4 / Zero`); 
+    displayOutput(`Advapi32.dll/Win_Sys_Media - 1.4.2 / Zero`);
+    displayOutput(`Comdlg32.dll/Win_Sys - 1.4.2 / High`);
+    displayOutput(`OpenGL32.dll/Win_Sys - 1.4.2 / Low`);
+    displayOutput(`PGHook.dll/MS_Teams_Sec - 0.1.6 / Low`);
+    displayOutput(`ctxapclient64.dll/MS_Teams - 3.3.1 / High`);
+    displayOutput(` - - - `);
+    displayOutput(`VULNERABLE: Kernel32.dll - Hijack/Injection [Windows System (Security)]`); 
+    displayOutput(`VULNERABLE: Advapi32.dll - Hijack [Windows System (Media)]`);
+    displayOutput(`VULNERABLE: Comdlg32.dll - Injection [Windows System]`);
+    displayOutput(`VULNERABLE: OpenGL32.dll - Injection [Windows System ]`);
+    displayOutput(`VULNERABLE: PGHook.dll - Hijack/Injection [Teams - Security]`);
+    displayOutput(`VULNERABLE: ctxapclient64.dll - Hijack [Teams]`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runSQLEnum(target) {
+  displayOutput(`Nmap scan report for ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`PORT   STATE  SERVICE  VERSION`);
+    displayOutput(`1433/tcp open	ms-sql-s`);
+    displayOutput(` - - - `);
+    simulateScanDelay(() => {
+    displayOutput(`MAC Address: 00:11:22:33:44:55`);
+    displayOutput(` - - - `);
+    simulateScanDelay(() => {
+    displayOutput(`Host script results:`);
+    displayOutput(`ms-sql-info:`);
+    displayOutput(`+ Windows server name: WIN-P8305778EQK`); 
+    displayOutput(`+ 192.168.1.146\SQLEXPRESS:`);
+    displayOutput(`+ Instance name: SQLEXPRESS`);
+    displayOutput(`	Version:`);
+    displayOutput(`	-	name: Microsoft SQL Server 2016 SP2`);
+    displayOutput(` - number: 13.00.5026.00`);
+    displayOutput(` - Product: Microsoft SQL Server 2016`);
+    displayOutput(` - Service pack level: SP2`);
+    displayOutput(` - Post-SP patches applied: false`);
+    displayOutput(`	TCP port: 1433`);
+    displayOutput(`	Clustered: false`);
+    displayOutput(` - - - `);
+    displayOutput(`Nmap done: 1 IP address (1 host up) scanned in 0.47 seconds`);
+    displayOutput(` - - - `);
+  });
+  });
+  });
+}
+
+function runDirectory(target) {
+  displayOutput(`Directory Scan for ${target}...`);
+	simulateScanDelay(() => {
+		displayOutput(` - - - `);
+		displayOutput(`Directory Scan`);
+		displayOutput(`- Target URI`);
+		displayOutput(`- File Paths`);
+		displayOutput(` - - - `);
+    simulateScanDelay(() => {
+		  displayOutput(`---- Scanning URL: ${target} ----`); 
+		  displayOutput(`+ ${target}/about.php (CODE:302|SIZE:0)`)
+		  displayOutput(`+ ${target}/index.php (CODE:302|SIZE:0)`)
+		  displayOutput(`+ ${target}/instructions.php (CODE:302|SIZE:0)`)
+		  displayOutput(`+ ${target}/login.php (CODE:200|SIZE:1289)`);
+		  displayOutput(`+ ${target}/logout.php (CODE:302|SIZE:0)`);
+		  displayOutput(`+ ${target}/phpinfo.php (CODE:302|SIZE:0)`);
+		  displayOutput(`+ ${target}/security.php (CODE:302|SIZE:0)`);
+		  displayOutput(`+ ${target}/setup.php (CODE:200|SIZE:3549)`);
+		  displayOutput(` - - - `);
+		  displayOutput(`DOWNLOADED: 4612 FOUND: 8`);
+		  displayOutput(` - - - `);
+});
+});
+}
+
+function runSessionEnum(target) {
+    displayOutput(`Scanning sessions for ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`PORT   STATE  SERVICE`);
+    displayOutput(`445/tcp open  microsoft-ds`);
+    displayOutput(` - - - `);
+    simulateScanDelay(() => {
+      displayOutput(`Host script results:`);
+      displayOutput(`smb-enum-users:`);
+      simulateScanDelay(() => {    
+        displayOutput(`+ User-PC\Administrator (RID: 500)`); 
+        displayOutput(`- - Description: Built-in account for administering the computer/domain`);
+        displayOutput(`- - Flags: Account disabled, Normal user account, Password does not expire`);
+          simulateScanDelay(() => {
+            displayOutput(`+ User-PC\Guest (RID: 501`);
+            displayOutput(`- - Description: Built-in account for administering the computer/domain`);
+            displayOutput(`- - Flags: Account disabled, Normal user account, Password not required, Password does not expire`);
+            simulateScanDelay(() => {
+              displayOutput(`+ User-PC\HomeGroupUser$ (RID: 1001)`);
+              displayOutput(`- - Full name: HomeGroupUser$`);
+              displayOutput(`- - Description: Built-in account for homegroup access to the computer`);
+              displayOutput(`- - Flags: Normal user account, Password does not expire`);
+              simulateScanDelay(() => {
+                displayOutput(`+ User-PC\User (RID: 1002)`);
+                displayOutput(`- - Flags: Normal user account, Password not required, Password does not expire `);
+                displayOutput(` - - - `);
+              });
+            });
+          });
+        });
+      });
+    });
+  }
+
+  function runProcessID(target) {
+displayOutput(`Scanning Processes for ${target}...`);
+simulateScanDelay(() => {
+	displayOutput(`WMI: process:proc_id:state:*-data`);
+	displayOutput(`DCOM: ${target}/*/Win32_Process/*.EXE`);
+	displayOutput(` - - - `);
+	simulateScanDelay(() => {
+      		displayOutput(`Host_script_results:`);
+      		displayOutput(`Process/Process_ID/State/:`);
+      		simulateScanDelay(() => {    
+        		displayOutput(`Process: EXPLORER.EXE`); 
+        		displayOutput(`- - ProcessID: 1468`);
+        		displayOutput(`- - State: RUNNING`);
+          		simulateScanDelay(() => {
+        			displayOutput(`Process: SVHOST.EXE`); 
+        			displayOutput(`- - ProcessID: 741`);
+        			displayOutput(`- - State: PAUSED`);
+            			simulateScanDelay(() => {
+        				displayOutput(`Process: SEC_MON.EXE`); 
+        				displayOutput(`- - ProcessID: 2311`);
+        				displayOutput(`- - State: IN_USE`);
+              				simulateScanDelay(() => {
+        					displayOutput(`Process: AV_AGENT.EXE`); 
+        					displayOutput(`- - ProcessID: 1429`);
+        					displayOutput(`- - State: IN_CHAIN`);
+                            displayOutput(` - - - `);
+              });
+            });
+          });
+        });
+      });
+    });
+  }
+
+function runMACAddressScan(target) {
+  displayOutput(`Scanning network interfaces for ${target}...`);
+  simulateScanDelay(() => {
+    const macAddresses = generateFakeMACAddresses();
+    displayOutput(`Discovered MAC Addresses for ${target}:`);
+    macAddresses.forEach(mac => displayOutput(`- ${mac}`));
+    displayOutput(` - - - `);
+  });
+}
+
+function generateFakeMACAddresses() {
+  const vendorPrefixes = [
+    "00:1A:2B", "00:1B:44", "00:1C:7F", "00:2A:8D",
+    "00:3D:6A", "00:4E:1C", "00:5F:AB", "00:6C:2D"
+  ];
+  let macs = [];
+  let numDevices = Math.floor(Math.random() * 4) + 2;
+
+  for (let i = 0; i < numDevices; i++) {
+    let prefix = vendorPrefixes[Math.floor(Math.random() * vendorPrefixes.length)];
+    let suffix = Array.from({ length: 3 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join(":");
+    macs.push(`${prefix}:${suffix}`);
+  }
+  return macs;
+}

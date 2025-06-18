@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Network Mapper</title>
+  <style>
+    /* styles.css */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: black;
+      color: #00ff00; /* Bright green text */
+      font-family: "Courier New", Courier, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .terminal {
+      width: 80%;
+      height: 70%;
+      max-width: 900px;
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+    }
+    .output {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    .input-line {
+      display: flex;
+      align-items: center;
+    }
+    .prompt {
+      color: #00ff00;
+    }
+    .user-input {
+      background: transparent;
+      border: none;
+      color: #00ff00;
+      outline: none;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 1rem;
+      width: 100%;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="terminal">
+    <h1 style="text-align: center;">Network Mapper</h1> 
+    <div id="output" class="output"></div>
+    <div class="input-line">
+      <span class="prompt">nmap> </span>
+      <input type="text" id="userInput" class="user-input" autofocus />
+    </div>
+  </div>
+
+  <script>
+    // Event listener for user input:
+    document.getElementById('userInput').addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        const userInput = event.target.value.trim();
+        event.target.value = ''; // Clear input
+        appendOutput(`nmap > ${userInput}`);
+        runNmapCommand(userInput);
+      }
+
+      
+    });
+
+    // Main command parsing function:
+    function runNmapCommand(command) {
+  // Clear previous output
+  document.getElementById("output").innerHTML = "";
+  
+  // Split the command into parts and trim any whitespace
+  const parts = command.trim().split(/\s+/);
+
+  // Validate that the command starts with "nmap"
+  if (parts[0] !== "nmap") {
+    displayError("Invalid command. Please start with 'nmap'.");
+    return;
+  }
+
+  // Special case: nmap clear
+  if (parts.length === 2 && parts[1].toLowerCase() === "clear") {
+    clearScreen;
+    return;
+  }
+
+  else if (parts.length === 2 && parts[1].toLowerCase() === "store") {
+    appendOutput(`Data moved to SHARED storage area.`);
+    return
+  }
+
+  else if (parts.length === 2 && parts[1].toLowerCase() === "save") {
+    appendOutput(`Data moved to PRIVATE storage area.`);
+    return
+  }
+
+  // Ensure there's at least a target: we expect at least 2 parts: nmap and <target>
+  if (parts.length < 2) {
+    displayError("Please provide a target or flags for the scan (e.g., 'nmap 1.1.1.1').");
+    return;
+  }
+
+  // The target is the last token
+  const target = parts[parts.length - 1];
+
+  // All tokens between the command and the target are flags.
+  const flags = parts.slice(1, parts.length - 1);
+
+  // If there are no flags, do a basic scan:
+  if (flags.length === 0) {
+    runBasicScan(target);
+    return;
+  }
+
+  // Process each flag:
+  flags.forEach(flag => {
+    switch (flag) {
+      case "-sP":
+        runPingScan(target);
+        break;
+      case "-O":
+        runOSDetection(target);
+        break;
+      case "-p":
+        // For port scan, you might expect the next token to be the ports list.
+        // You can design the parser to capture that as well.
+        // For simplicity, let's assume '-p' is combined with ports in a different format.
+        runPortScan([flag], target);  // Pass an array with flag if needed.
+        break;
+      case "-A":
+        runAggressiveScan(target);
+        break;
+      case "-sV":
+        runServiceScan(target);
+      break;
+      case "--script=banner":
+        runBannerGrabber(target);
+        break;
+      case "-Fe":
+        runFirewallEvasion(target);
+        break;
+      case "-Fd":
+        runFirewallDetect(target);
+        break; 
+      case "--spoof-mac-t":
+        // Here, you might expect another token for the MAC address.
+        // You could extend the logic to handle that.
+        runMacSpoofing([flag], target);
+        break;
+      case "--spoof-mac-p":
+        // Here, you might expect another token for the MAC address.
+        // You could extend the logic to handle that.
+        runMacSpoofPerm([flag], target);
+        break;
+      case "--reset-mac":
+        // Here, you might expect another token for the MAC address.
+        // You could extend the logic to handle that.
+        runMacSpoofReset([flag], target);
+        break;
+      case "--script=vuln":
+        runVulnerabilityDetection(target);
+        break;
+        case "-m":
+        runMACAddressScan(target);
+        break;
+        case "-prox":
+          // Run scan traffic via named proxy servers
+        runProxy(target);
+        break;
+        case "-prox_logs":
+          // Run scan traffic via named proxy servers. Delete proxy logs afterwards
+        runProxyLog(target);
+        break;
+        case "-sV_NoTrace":
+          // Runs a Service Scan but TraceRoute is disabled
+        runServiceScanNoTrace(target);
+        break;
+        case "--script=dll_vuln":
+          // Lists vulnerable Data Link Libraries
+        runVulnerableDLL(target);
+        break;
+        case "--script=ms_sql":
+          // Scans for SQL servers
+        runSQLEnum(target);
+        break;
+        case "--script=sess_enum":
+          // Scans for vulnerable sessions
+        runSessionEnum(target);
+        break;
+        case "--script=dirb":
+          // Scans for vulberable URI and/or Path data (As per a Dirb or GoBuster scan)
+        runDirectory(target);
+        break;
+        case "--script=proc":
+          // Scans for running processes [Set for running EXE's])
+        runProcessID(target);
+        break;
+      default:
+        displayError(`Unknown flag: ${flag}`);
+    }
+  });
+}
+
+// Example implementations for the scan functions (each expects a target)
+function runBasicScan(target) {
+  simulateScanDelay(() => {
+    appendOutput(`Starting Nmap scan on ${target}...`);
+    simulateScanDelay(() => {
+      appendOutput(`Scan complete. Found open ports: 22, 80, 443`);
+      appendOutput(`Nmap scan report for ${target}`);
+      appendOutput(`Host is up (0.0012s latency)`);
+      displayOutput(` - - - `);
+    });
+  });
+}
+
+function runPingScan(target) {
+  displayOutput(`Starting Ping Scan on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`Host ${target} is up. (0.0023s latency)`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runOSDetection(target) {
+  displayOutput(`Performing OS Detection on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`OS detection for ${target}: Linux Kernel 5.4 (Ubuntu)`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runPortScan(flagParts, target) {
+  // This is a placeholder; you can expand this function to parse a list of ports.
+  displayOutput(`Scanning ports on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`22/tcp open http`);
+    displayOutput(`80/tcp open http`);
+    displayOutput(`443/tcp open https`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runAggressiveScan(target) {
+  displayOutput(`Performing Aggressive Scan on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`OS: Linux Kernel 5.4 (Ubuntu)`);
+    displayOutput(`22/tcp open ssh OpenSSH 8.4p1`);
+    displayOutput(`80/tcp open http Apache 2.4.41`);
+    displayOutput(`Traceroute: LocalHost -> ${target}.`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runServiceScan(target) {
+  displayOutput(`Performing Service Scan on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`22/tcp open ssh OpenSSH 8.4p1`);
+    displayOutput(`80/tcp open http Apache 2.4.41`);
+    displayOutput(`Traceroute: LocalHost -> ${target}.`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runServiceScanNoTrace(target) {
+  displayOutput(`Performing Service Scan on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`OS: Linux Kernel 5.4 (Ubuntu)`);
+    displayOutput(`22/tcp open ssh OpenSSH 8.4p1`);
+    displayOutput(`80/tcp open http Apache 2.4.41`);
+    displayOutput(`Traceroute: DISABLED!`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runBannerGrabber(target) {
+  displayOutput(`Running Banner Grabber on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`22/tcp open ssh OpenSSH 8.4p1`);
+    displayOutput(`80/tcp open http Apache 2.4.41`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runFirewallEvasion(target) {
+  displayOutput(`Running Firewall Scan on ${target} using Random Decoys...`);
+  simulateScanDelay(() => {
+    displayOutput(`Using random decoys: 137.0.113.5, 198.51.100.23, 192.0.2.10`);
+    displayOutput(`Scan complete. Target: ${target} - No Firewall detected.`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runFirewallDetect(target) {
+  displayOutput(`Running Firewall Scan on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`Scan complete. Target: ${target} - Firewall detected.`);
+    displayOutput(` - - - `);
+    simulateScanDelay(() => {
+      displayOutput(`Firewall Make:`);
+      displayOutput(`Firewall Model:`);
+      displayOutput(`Firewall MAC:`);
+      displayOutput(` - - - `);
+  });
+});
+}
+
+function runMacSpoofing(flagParts, target) {
+  // This is a placeholder; you could parse the MAC address from flagParts if provided.
+  displayOutput(`Spoofing MAC address for connection to ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`Stripping legitimate MAC address from tramsmission...`);
+    simulateScanDelay(() => {
+      displayOutput(`Using MAC Address: 00:11:22:33:44:55 (Fake Vendor)`);
+      simulateScanDelay(() => {
+        displayOutput(`MAC address spoofing complete.`);
+        displayOutput(`MAC address reset to original.`);
+        displayOutput(` - - - `);
+  });
+});
+});
+}
+
+function runMacSpoofPerm(flagParts, target) {
+  displayOutput(`Spoofing MAC address for connection to ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`Stripping legitimate MAC address from tramsmission...`);
+    simulateScanDelay(() => {
+      displayOutput(`Using MAC Address: 00:11:22:33:44:55 (Fake Vendor)`);
+      simulateScanDelay(() => {
+        displayOutput(`MAC address spoofing complete.`);
+        displayOutput(`New MAC address set for further communications.`);
+        displayOutput(` - - - `);
+  });
+});
+});
+}
+
+function runMacSpoofReset() {
+  displayOutput(`Resetting MAC address to Original...`);
+  displayOutput(` - - - `);
+  simulateScanDelay(() => {
+    displayOutput(`MAC Address resetting.`);
+    displayOutput(` - - - `);
+    simulateScanDelay(() => {
+      displayOutput(`MAC Address reset complete.`);
+      displayOutput(` - - - `);
+  });
+});
+}
+
+
+function runProxy(target) {
+  // This is a placeholder; you could parse the MAC address from flagParts if provided.
+  displayOutput(`Scan target:${target}...`);
+  displayOutput(`Proxy Server Connection: True`);
+  simulateScanDelay(() => {
+    displayOutput(`Connection proxy: LocalHost -> 38.41.10.12 -> 188.210.48.210 -> ${target}`);
+    displayOutput(`Proxy server complete.`);
+    displayOutput(`Reset to default.`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runProxyLog(target) {
+    displayOutput(`Scan target:${target}...`);
+    displayOutput(`Proxy Server Connection: True`);
+    simulateScanDelay(() => {
+        displayOutput(`Connection proxy: LocalHost -> 38.41.10.12 -> 188.210.48.210 -> ${target}`);
+        displayOutput(`Proxy server complete.`);
+        displayOutput(`Reset to default.`);
+        simulateScanDelay(() => {
+            displayOutput(`Accessing logs: 188.210.48.210`);
+            displayOutput(`Log erase - 188.210.48.210 - running`);
+            displayOutput(`Log erase - 188.210.48.210 - complete`);
+            simulateScanDelay(() => {
+                displayOutput(`Accessing logs: 38.41.10.12`);
+                displayOutput(`Log erase - 38.41.10.12 - running`);
+                displayOutput(`Log erase - 38.41.10.12 - complete`);
+                simulateScanDelay(() => {
+                  displayOutput(`Logs erased.`);
+                  displayOutput(` - - - `);
+            }); // Closing brace for innermost simulateScanDelay
+        }); // Closing brace for second simulateScanDelay
+    }); // Closing brace for outermost simulateScanDelay
+  });
+}
+
+function runVulnerabilityDetection(target) {
+  displayOutput(`Scanning for vulnerabilities on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`PORT   STATE  SERVICE  VERSION`);
+    displayOutput(`445/tcp open smb Microsoft Windows SMBv1`);
+    displayOutput(`VULNERABLE: MS17-010: Remote Code Execution Vulnerability (EternalBlue)`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runVulnerableDLL(target) {
+  displayOutput(`Scanning for vulnerable Data Link Libraries on ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`Kernel32.dll/Win_Sys_Sec - 0.2.4 / Zero`); 
+    displayOutput(`Advapi32.dll/Win_Sys_Media - 1.4.2 / Zero`);
+    displayOutput(`Comdlg32.dll/Win_Sys - 1.4.2 / High`);
+    displayOutput(`OpenGL32.dll/Win_Sys - 1.4.2 / Low`);
+    displayOutput(`PGHook.dll/MS_Teams_Sec - 0.1.6 / Low`);
+    displayOutput(`ctxapclient64.dll/MS_Teams - 3.3.1 / High`);
+    displayOutput(` - - - `);
+    displayOutput(`VULNERABLE: Kernel32.dll - Hijack/Injection [Windows System (Security)]`); 
+    displayOutput(`VULNERABLE: Advapi32.dll - Hijack [Windows System (Media)]`);
+    displayOutput(`VULNERABLE: Comdlg32.dll - Injection [Windows System]`);
+    displayOutput(`VULNERABLE: OpenGL32.dll - Injection [Windows System ]`);
+    displayOutput(`VULNERABLE: PGHook.dll - Hijack/Injection [Teams - Security]`);
+    displayOutput(`VULNERABLE: ctxapclient64.dll - Hijack [Teams]`);
+    displayOutput(` - - - `);
+  });
+}
+
+function runSQLEnum(target) {
+  displayOutput(`Nmap scan report for ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`PORT   STATE  SERVICE  VERSION`);
+    displayOutput(`1433/tcp open	ms-sql-s`);
+    displayOutput(` - - - `);
+    simulateScanDelay(() => {
+    displayOutput(`MAC Address: 00:11:22:33:44:55`);
+    displayOutput(` - - - `);
+    simulateScanDelay(() => {
+    displayOutput(`Host script results:`);
+    displayOutput(`ms-sql-info:`);
+    displayOutput(`+ Windows server name: WIN-P8305778EQK`); 
+    displayOutput(`+ 192.168.1.146\SQLEXPRESS:`);
+    displayOutput(`+ Instance name: SQLEXPRESS`);
+    displayOutput(`	Version:`);
+    displayOutput(`	-	name: Microsoft SQL Server 2016 SP2`);
+    displayOutput(` - number: 13.00.5026.00`);
+    displayOutput(` - Product: Microsoft SQL Server 2016`);
+    displayOutput(` - Service pack level: SP2`);
+    displayOutput(` - Post-SP patches applied: false`);
+    displayOutput(`	TCP port: 1433`);
+    displayOutput(`	Clustered: false`);
+    displayOutput(` - - - `);
+    displayOutput(`Nmap done: 1 IP address (1 host up) scanned in 0.47 seconds`);
+    displayOutput(` - - - `);
+  });
+  });
+  });
+}
+
+function runDirectory(target) {
+  displayOutput(`Directory Scan for ${target}...`);
+	simulateScanDelay(() => {
+		displayOutput(` - - - `);
+		displayOutput(`Directory Scan`);
+		displayOutput(`- Target URI`);
+		displayOutput(`- File Paths`);
+		displayOutput(` - - - `);
+    simulateScanDelay(() => {
+		  displayOutput(`---- Scanning URL: ${target} ----`); 
+		  displayOutput(`+ ${target}/about.php (CODE:302|SIZE:0)`)
+		  displayOutput(`+ ${target}/index.php (CODE:302|SIZE:0)`)
+		  displayOutput(`+ ${target}/instructions.php (CODE:302|SIZE:0)`)
+		  displayOutput(`+ ${target}/login.php (CODE:200|SIZE:1289)`);
+		  displayOutput(`+ ${target}/logout.php (CODE:302|SIZE:0)`);
+		  displayOutput(`+ ${target}/phpinfo.php (CODE:302|SIZE:0)`);
+		  displayOutput(`+ ${target}/security.php (CODE:302|SIZE:0)`);
+		  displayOutput(`+ ${target}/setup.php (CODE:200|SIZE:3549)`);
+		  displayOutput(` - - - `);
+		  displayOutput(`DOWNLOADED: 4612 FOUND: 8`);
+		  displayOutput(` - - - `);
+});
+});
+}
+
+function runSessionEnum(target) {
+    displayOutput(`Scanning sessions for ${target}...`);
+  simulateScanDelay(() => {
+    displayOutput(`PORT   STATE  SERVICE`);
+    displayOutput(`445/tcp open  microsoft-ds`);
+    displayOutput(` - - - `);
+    simulateScanDelay(() => {
+      displayOutput(`Host script results:`);
+      displayOutput(`smb-enum-users:`);
+      simulateScanDelay(() => {    
+        displayOutput(`+ User-PC\Administrator (RID: 500)`); 
+        displayOutput(`- - Description: Built-in account for administering the computer/domain`);
+        displayOutput(`- - Flags: Account disabled, Normal user account, Password does not expire`);
+          simulateScanDelay(() => {
+            displayOutput(`+ User-PC\Guest (RID: 501`);
+            displayOutput(`- - Description: Built-in account for administering the computer/domain`);
+            displayOutput(`- - Flags: Account disabled, Normal user account, Password not required, Password does not expire`);
+            simulateScanDelay(() => {
+              displayOutput(`+ User-PC\HomeGroupUser$ (RID: 1001)`);
+              displayOutput(`- - Full name: HomeGroupUser$`);
+              displayOutput(`- - Description: Built-in account for homegroup access to the computer`);
+              displayOutput(`- - Flags: Normal user account, Password does not expire`);
+              simulateScanDelay(() => {
+                displayOutput(`+ User-PC\User (RID: 1002)`);
+                displayOutput(`- - Flags: Normal user account, Password not required, Password does not expire `);
+                displayOutput(` - - - `);
+              });
+            });
+          });
+        });
+      });
+    });
+  }
+
+  function runProcessID(target) {
+displayOutput(`Scanning Processes for ${target}...`);
+simulateScanDelay(() => {
+	displayOutput(`WMI: process:proc_id:state:*-data`);
+	displayOutput(`DCOM: ${target}/*/Win32_Process/*.EXE`);
+	displayOutput(` - - - `);
+	simulateScanDelay(() => {
+      		displayOutput(`Host_script_results:`);
+      		displayOutput(`Process/Process_ID/State/:`);
+      		simulateScanDelay(() => {    
+        		displayOutput(`Process: EXPLORER.EXE`); 
+        		displayOutput(`- - ProcessID: 1468`);
+        		displayOutput(`- - State: RUNNING`);
+          		simulateScanDelay(() => {
+        			displayOutput(`Process: SVHOST.EXE`); 
+        			displayOutput(`- - ProcessID: 741`);
+        			displayOutput(`- - State: PAUSED`);
+            			simulateScanDelay(() => {
+        				displayOutput(`Process: SEC_MON.EXE`); 
+        				displayOutput(`- - ProcessID: 2311`);
+        				displayOutput(`- - State: IN_USE`);
+              				simulateScanDelay(() => {
+        					displayOutput(`Process: AV_AGENT.EXE`); 
+        					displayOutput(`- - ProcessID: 1429`);
+        					displayOutput(`- - State: IN_CHAIN`);
+                            displayOutput(` - - - `);
+              });
+            });
+          });
+        });
+      });
+    });
+  }
+
+function runMACAddressScan(target) {
+  displayOutput(`Scanning network interfaces for ${target}...`);
+  simulateScanDelay(() => {
+    const macAddresses = generateFakeMACAddresses();
+    displayOutput(`Discovered MAC Addresses for ${target}:`);
+    macAddresses.forEach(mac => displayOutput(`- ${mac}`));
+    displayOutput(` - - - `);
+  });
+}
+
+function generateFakeMACAddresses() {
+  const vendorPrefixes = [
+    "00:1A:2B", "00:1B:44", "00:1C:7F", "00:2A:8D",
+    "00:3D:6A", "00:4E:1C", "00:5F:AB", "00:6C:2D"
+  ];
+  let macs = [];
+  let numDevices = Math.floor(Math.random() * 4) + 2;
+
+  for (let i = 0; i < numDevices; i++) {
+    let prefix = vendorPrefixes[Math.floor(Math.random() * vendorPrefixes.length)];
+    let suffix = Array.from({ length: 3 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join(":");
+    macs.push(`${prefix}:${suffix}`);
+  }
+  return macs;
+}
+
+// Output helper functions:
+function displayOutput(text) {
+  const outputDiv = document.getElementById("output");
+  const p = document.createElement("p");
+  p.innerText = text;
+  outputDiv.appendChild(p);
+  window.scrollTo(0, document.body.scrollHeight);
+}
+function displayError(message) {
+  const outputDiv = document.getElementById("output");
+  const p = document.createElement("p");
+  p.innerText = `Error: ${message}`;
+  p.style.color = "red";
+  outputDiv.appendChild(p);
+  window.scrollTo(0, document.body.scrollHeight);
+}
+function appendOutput(text) {
+  const outputDiv = document.getElementById("output");
+  outputDiv.innerHTML += `<div>${text}</div>`;
+  outputDiv.scrollTop = outputDiv.scrollHeight;
+}
+function clearScreen() {
+  document.getElementById("output").innerHTML = "";
+}
+function simulateScanDelay(callback) {
+  setTimeout(callback, Math.random() * 3000 + 1000);
+}
+  </script>
+</body>
+</html>

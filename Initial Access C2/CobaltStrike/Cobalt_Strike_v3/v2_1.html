@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced C2 Simulation</title>
+    <style>
+        /* ==================== BASE STYLES ==================== */
+        body {
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ==================== MAIN LAYOUT ==================== */
+        .main-container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        /* ==================== NETWORK VISUALIZATION ==================== */
+        .network-container {
+            flex-grow: 1;
+            position: relative;
+            background-color: #111;
+            overflow: hidden;
+            border-right: 1px solid #333;
+        }
+
+        /* Device styling */
+        .device {
+            width: 70px;
+            height: 70px;
+            background-color: #1a3e72;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            position: absolute;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        .device:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 100, 255, 0.7);
+        }
+
+        .attacker {
+            background-color: #721a1a;
+            box-shadow: 0 0 10px rgba(255, 50, 50, 0.7);
+            z-index: 20;
+        }
+
+        /* Device states */
+        .selected {
+            outline: 3px solid yellow;
+        }
+
+        .limited-compromise {
+            outline: 3px solid silver;
+            background-color: #3e1a72;
+        }
+
+        .fully-compromised {
+            outline: 3px solid goldenrod;
+            background-color: #723e1a;
+        }
+
+        .beacon-active {
+            animation: pulse 2s infinite;
+        }
+
+        /* Connection lines */
+        .connection {
+            position: absolute;
+            height: 2px;
+            transform-origin: left center;
+            z-index: 5;
+        }
+
+        /* Connection types */
+        .connection.http {
+            background-color: #4e9a06;
+        }
+
+        .connection.https {
+            background-color: #8ae234;
+        }
+
+        .connection.dns {
+            background-color: #729fcf;
+        }
+
+        .connection.smb {
+            background-color: #ad7fa8;
+        }
+
+        /* ==================== CONTROL PANELS ==================== */
+        .control-panel {
+            width: 300px;
+            background-color: rgba(20, 20, 20, 0.95);
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #333;
+            overflow: hidden;
+        }
+
+        .panel-section {
+            padding: 10px;
+            border-bottom: 1px solid #333;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .panel-section h3 {
+            margin-top: 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #444;
+            color: #4e9a06;
+        }
+
+        /* ==================== COMMAND INTERFACE ==================== */
+        .command-interface {
+            height: 150px;
+            background-color: rgba(10, 10, 10, 0.95);
+            border-top: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .command-log {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 5px;
+            font-size: 13px;
+        }
+
+        .command-input {
+            padding: 8px;
+            background: #111;
+            color: #e0e0e0;
+            border: 1px solid #333;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        /* ==================== LISTENER UI ==================== */
+        .listener-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background-color: rgba(30, 30, 30, 0.7);
+            border-left: 3px solid #4e9a06;
+            cursor: pointer;
+        }
+
+        .listener-item.inactive {
+            border-left-color: #cc0000;
+            opacity: 0.7;
+        }
+
+        .listener-details {
+            font-size: 12px;
+            color: #888;
+            margin-top: 3px;
+        }
+
+        /* ==================== BEACON UI ==================== */
+        .beacon-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background-color: rgba(40, 30, 30, 0.7);
+            border-left: 3px solid #ce5c00;
+            cursor: pointer;
+        }
+
+        .beacon-item.active {
+            border-left-color: #4e9a06;
+        }
+
+        .beacon-item.dead {
+            border-left-color: #5c3566;
+            opacity: 0.5;
+        }
+
+        .beacon-details {
+            font-size: 12px;
+            color: #888;
+            margin-top: 3px;
+        }
+
+        /* ==================== ANIMATIONS ==================== */
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        @keyframes pulse-fast {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Network Visualization Area -->
+        <div class="network-container" id="network">
+            <!-- Devices will be added dynamically -->
+            <div class="device attacker" id="attacker">Attacker</div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <!-- Listeners Section -->
+            <div class="panel-section" id="listeners-panel">
+                <h3>Listeners</h3>
+                <div id="listeners-container"></div>
+                <button id="create-listener-btn" style="margin-top: 10px; padding: 5px;">Create Listener</button>
+            </div>
+
+            <!-- Beacons Section -->
+            <div class="panel-section" id="beacons-panel">
+                <h3>Beacons</h3>
+                <div id="beacons-container"></div>
+            </div>
+
+            <!-- Target Info Section -->
+            <div class="panel-section" id="info-panel">
+                <h3>Target Information</h3>
+                <div id="device-info">Select a device to view details.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Command Interface -->
+    <div class="command-interface">
+        <div class="command-log" id="command-log"></div>
+        <input type="text" class="command-input" id="cli" placeholder="Enter command..." autofocus>
+    </div>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        // Customize these values to change the simulation behavior
+
+        const CONFIG = {
+            // Network devices configuration
+            networkDevices: {
+                // Initial devices to spawn
+                initialDevices: [
+                    { id: 'device1', name: 'Router', x: 200, y: 150 },
+                    { id: 'device2', name: 'Workstation-1', x: 350, y: 100 },
+                    { id: 'device3', name: 'Server-1', x: 350, y: 200 },
+                    { id: 'device4', name: 'Workstation-2', x: 500, y: 150 }
+                ],
+                
+                // Device metadata (can be expanded)
+                deviceMetadata: {
+                    'device1': { 
+                        type: 'router', 
+                        ip: '192.168.1.1', 
+                        os: 'Cisco IOS 15.1', 
+                        security: 'Firewall Enabled' 
+                    },
+                    'device2': { 
+                        type: 'workstation', 
+                        ip: '192.168.1.10', 
+                        os: 'Windows 10 Pro', 
+                        security: 'Defender Active' 
+                    },
+                    'device3': { 
+                        type: 'server', 
+                        ip: '192.168.1.100', 
+                        os: 'Windows Server 2019', 
+                        security: 'Firewall + IDS' 
+                    },
+                    'device4': { 
+                        type: 'workstation', 
+                        ip: '192.168.1.11', 
+                        os: 'Windows 10 Enterprise', 
+                        security: '3rd Party AV' 
+                    },
+                    'attacker': { 
+                        type: 'attacker', 
+                        ip: '10.0.0.50', 
+                        os: 'Kali Linux', 
+                        security: 'N/A' 
+                    }
+                },
+                
+                // How devices can discover other devices
+                deviceDiscovery: {
+                    'device1': ['device2', 'device3'],
+                    'device2': ['device4'],
+                    'device3': ['device4']
+                },
+                
+                // Default device appearance
+                deviceAppearance: {
+                    workstation: { color: '#1a3e72', textColor: '#fff' },
+                    server: { color: '#1a5272', textColor: '#fff' },
+                    router: { color: '#1a724e', textColor: '#fff' },
+                    attacker: { color: '#721a1a', textColor: '#fff' }
+                }
+            },
+            
+            // Listeners configuration
+            listeners: {
+                // Available listener types
+                types: [
+                    { name: 'HTTP', port: 80, color: '#4e9a06' },
+                    { name: 'HTTPS', port: 443, color: '#8ae234' },
+                    { name: 'DNS', port: 53, color: '#729fcf' },
+                    { name: 'SMB', port: 445, color: '#ad7fa8' }
+                ],
+                
+                // Default listener options
+                defaultOptions: {
+                    host: '0.0.0.0',
+                    sleep: 60,
+                    jitter: 30
+                }
+            },
+            
+            // Beacons configuration
+            beacons: {
+                // Beacon checkin times (seconds)
+                checkinTimes: {
+                    active: 5,
+                    dormant: 60,
+                    dead: 300
+                },
+                
+                // Available commands and their simulated outputs
+                commands: {
+                    'whoami': () => `domain\\user${Math.floor(Math.random()*10)}`,
+                    'ipconfig': () => `Windows IP Configuration\n\nEthernet adapter Ethernet0:\n   Connection-specific DNS Suffix  . : localdomain\n   IPv4 Address. . . . . . . . . . . : 192.168.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}\n   Subnet Mask . . . . . . . . . . . : 255.255.255.0\n   Default Gateway . . . . . . . . . : 192.168.1.1`,
+                    'ls': () => ['Desktop', 'Documents', 'Downloads', 'secrets.txt'].sort(() => Math.random() - 0.5).join('\n'),
+                    'ps': () => `  PID  Name\n  ${1000+Math.floor(Math.random()*9000)}  explorer.exe\n  ${1000+Math.floor(Math.random()*9000)}  ${['chrome.exe', 'firefox.exe', 'teams.exe'][Math.floor(Math.random()*3)]}`,
+                    'getuid': () => `[*] Tasked beacon to get user identity\n[+] Host: ${['WORKSTATION-', 'SERVER-', 'PC-'][Math.floor(Math.random()*3)]}${Math.floor(Math.random()*100)}\n[+] Current user: DOMAIN\\user${Math.floor(Math.random()*10)}`,
+                    'shell whoami /priv': () => `PRIVILEGES INFORMATION\n----------------------\nPrivilege Name                Description                          State\n============================= ==================================== ========\nSeShutdownPrivilege           Shut down the system                 Disabled\nSeChangeNotifyPrivilege       Bypass traverse checking             Enabled\nSeUndockPrivilege             Remove computer from docking station Disabled\nSeIncreaseWorkingSetPrivilege Increase a process working set       Disabled`
+                }
+            },
+            
+            // UI settings
+            ui: {
+                maxCommandHistory: 100,
+                logEntryLifetime: 30000 // 30 seconds
+            }
+        };
+
+        // ==================== CORE SYSTEMS ====================
+
+        /**
+         * Listener Manager - Handles creation and management of listeners
+         */
+        class ListenerManager {
+            constructor() {
+                this.listeners = [];
+                this.nextPort = 8080; // Starting port for dynamic listeners
+            }
+            
+            /**
+             * Create a new listener
+             * @param {string} type - Listener type (HTTP, HTTPS, DNS, SMB)
+             * @param {object} options - Listener options
+             * @returns {object} The created listener
+             */
+            createListener(type, options = {}) {
+                const listenerType = CONFIG.listeners.types.find(t => t.name.toLowerCase() === type.toLowerCase());
+                
+                if (!listenerType) {
+                    logCommand(`[!] Error: Invalid listener type '${type}'`);
+                    return null;
+                }
+                
+                const listener = {
+                    id: `listener-${Math.random().toString(36).substr(2, 6)}`,
+                    type: listenerType.name,
+                    port: options.port || listenerType.port || this.nextPort++,
+                    host: options.host || CONFIG.listeners.defaultOptions.host,
+                    sleep: options.sleep || CONFIG.listeners.defaultOptions.sleep,
+                    jitter: options.jitter || CONFIG.listeners.defaultOptions.jitter,
+                    active: true,
+                    beacons: [],
+                    color: listenerType.color,
+                    createdAt: new Date()
+                };
+                
+                this.listeners.push(listener);
+                updateListenersUI();
+                logCommand(`[+] Started ${listener.type} listener on ${listener.host}:${listener.port}`);
+                
+                return listener;
+            }
+            
+            /**
+             * Stop a listener
+             * @param {string} listenerId - ID of the listener to stop
+             */
+            stopListener(listenerId) {
+                const listener = this.listeners.find(l => l.id === listenerId);
+                if (listener) {
+                    listener.active = false;
+                    updateListenersUI();
+                    logCommand(`[-] Stopped ${listener.type} listener ${listenerId}`);
+                }
+            }
+            
+            /**
+             * Get a listener by ID
+             * @param {string} listenerId 
+             * @returns {object|null} The listener or null if not found
+             */
+            getListener(listenerId) {
+                return this.listeners.find(l => l.id === listenerId) || null;
+            }
+        }
+
+        /**
+         * Beacon Manager - Handles beacon creation and communication
+         */
+        class BeaconManager {
+            constructor() {
+                this.beacons = [];
+            }
+            
+            /**
+             * Create a new beacon
+             * @param {string} listenerId - ID of the parent listener
+             * @param {string} targetId - ID of the target device
+             * @returns {object} The created beacon
+             */
+            createBeacon(listenerId, targetId) {
+                const listener = listenerManager.getListener(listenerId);
+                if (!listener) {
+                    logCommand(`[!] Error: Listener ${listenerId} not found`);
+                    return null;
+                }
+                
+                const target = document.getElementById(targetId);
+                if (!target) {
+                    logCommand(`[!] Error: Target device ${targetId} not found`);
+                    return null;
+                }
+                
+                const beacon = {
+                    id: `beacon-${Math.random().toString(36).substr(2, 6)}`,
+                    listenerId,
+                    targetId,
+                    lastCheckin: new Date(),
+                    status: 'active',
+                    privilegeLevel: Math.random() > 0.7 ? 'system' : 'user',
+                    commandQueue: [],
+                    results: [],
+                    sleep: listener.sleep,
+                    jitter: listener.jitter
+                };
+                
+                this.beacons.push(beacon);
+                listener.beacons.push(beacon.id);
+                
+                // Mark device as compromised
+                deviceStates[targetId] = {
+                    status: 'compromised',
+                    beaconId: beacon.id,
+                    compromisedAt: new Date()
+                };
+                
+                target.classList.add('fully-compromised');
+                updateBeaconsUI();
+                
+                // Create visual connection
+                createConnection(
+                    document.getElementById('attacker'),
+                    target,
+                    listener.type.toLowerCase(),
+                    listener.color
+                );
+                
+                logCommand(`[+] Beacon ${beacon.id} established with ${targetId} via ${listener.type}`);
+                
+ // Add periodic callback
+ beacon.callbackInterval = setInterval(() => {
+                    this.processCallback(beacon);
+                    
+                    // Visual feedback
+                    target.classList.add('beacon-active');
+                    setTimeout(() => target.classList.remove('beacon-active'), 1000);
+                    
+                    // Temporary connection line during callback
+                    const tempLine = createConnection(
+                        target,
+                        document.getElementById('attacker'),
+                        'callback',
+                        '#ff6600'
+                    );
+                    setTimeout(() => {
+                        if (tempLine && tempLine.parentNode) {
+                            tempLine.remove();
+                        }
+                    }, 500);
+                    
+                }, beacon.sleep * 1000 * (1 + (Math.random() * beacon.jitter / 100)));
+                
+                return beacon;
+            }
+            
+            /**
+             * Execute a command on a beacon
+             * @param {string} beaconId - ID of the beacon
+             * @param {string} command - Command to execute
+             */
+            executeCommand(beaconId, command) {
+                const beacon = this.beacons.find(b => b.id === beaconId);
+                if (!beacon) {
+                    logCommand(`[!] Error: Beacon ${beaconId} not found`);
+                    return;
+                }
+                
+                beacon.commandQueue.push(command);
+                logCommand(`[*] Tasked beacon ${beaconId} (${beacon.targetId}) to execute: ${command}`);
+                
+                // Simulate command execution with random delay
+                const delay = 1000 + Math.random() * 3000;
+                setTimeout(() => {
+                    const output = this.simulateCommandOutput(command, beacon);
+                    beacon.results.push(output);
+                    
+                    // Update last checkin time
+                    beacon.lastCheckin = new Date();
+                    
+                    // Log the output
+                    logCommand(`[+] Beacon ${beaconId} (${beacon.targetId}) output:\n${output}`);
+                    
+                    updateBeaconsUI();
+                }, delay);
+            }
+            
+            /**
+             * Simulate command output
+             * @param {string} command 
+             * @param {object} beacon 
+             * @returns {string} Simulated command output
+             */
+            simulateCommandOutput(command, beacon) {
+                const cmd = command.toLowerCase().split(' ')[0];
+                const cmdHandler = CONFIG.beacons.commands[cmd];
+                
+                if (cmdHandler) {
+                    return cmdHandler();
+                }
+                
+                return `'${command}' is not recognized as an internal or external command, operable program or batch file.`;
+            }
+            
+            /**
+             * Get beacon by ID
+             * @param {string} beaconId 
+             * @returns {object|null} The beacon or null if not found
+             */
+            getBeacon(beaconId) {
+                return this.beacons.find(b => b.id === beaconId) || null;
+            }
+            
+            /**
+             * Update beacon statuses based on checkin times
+             */
+            updateBeaconStatuses() {
+                const now = new Date();
+                const activeThreshold = CONFIG.beacons.checkinTimes.active * 1000;
+                const dormantThreshold = CONFIG.beacons.checkinTimes.dormant * 1000;
+                const deadThreshold = CONFIG.beacons.checkinTimes.dead * 1000;
+                
+                this.beacons.forEach(beacon => {
+                    const timeSinceCheckin = now - beacon.lastCheckin;
+                    
+                    if (timeSinceCheckin < activeThreshold) {
+                        beacon.status = 'active';
+                    } else if (timeSinceCheckin < dormantThreshold) {
+                        beacon.status = 'dormant';
+                    } else if (timeSinceCheckin < deadThreshold) {
+                        beacon.status = 'dead';
+                    } else {
+                        // Remove dead beacons after timeout
+                        const index = this.beacons.indexOf(beacon);
+                        if (index > -1) {
+                            this.beacons.splice(index, 1);
+                        }
+                    }
+                });
+                
+                updateBeaconsUI();
+            }
+        }
+
+        // ==================== NETWORK MANAGEMENT ====================
+
+        /**
+         * Device state tracking
+         */
+        const deviceStates = {};
+
+        /**
+         * Create a connection between two devices
+         * @param {HTMLElement} from - Source device element
+         * @param {HTMLElement} to - Target device element
+         * @param {string} type - Connection type (http, https, dns, smb)
+         * @param {string} color - Connection color
+         */
+        function createConnection(from, to, type, color) {
+            if (!from || !to) {
+                console.error("Invalid connection targets");
+                return;
+            }
+            
+            const container = document.querySelector(".network-container");
+            const line = document.createElement("div");
+            line.classList.add("connection", type);
+            line.dataset.from = from.id;
+            line.dataset.to = to.id;
+            line.dataset.type = type;
+            
+            // Use provided color or default
+            if (color) {
+                line.style.backgroundColor = color;
+            }
+            
+            container.appendChild(line);
+            
+            // Position the line
+            updateConnectionPosition(line, from, to);
+            
+            // Re-position connections when window resizes
+            window.addEventListener('resize', () => {
+                updateConnectionPosition(line, from, to);
+            });
+        }
+
+        /**
+         * Update connection line position
+         * @param {HTMLElement} line - Connection line element
+         * @param {HTMLElement} from - Source device
+         * @param {HTMLElement} to - Target device
+         */
+        function updateConnectionPosition(line, from, to) {
+            const container = document.querySelector(".network-container");
+            const fromRect = from.getBoundingClientRect();
+            const toRect = to.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            
+            const x1 = fromRect.left + fromRect.width / 2 - containerRect.left;
+            const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
+            const x2 = toRect.left + toRect.width / 2 - containerRect.left;
+            const y2 = toRect.top + toRect.height / 2 - containerRect.top;
+            
+            const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+            const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+            
+            line.style.width = `${length}px`;
+            line.style.transform = `rotate(${angle}deg)`;
+            line.style.top = `${y1}px`;
+            line.style.left = `${x1}px`;
+        }
+
+        /**
+         * Initialize network devices
+         */
+         function initializeNetwork() {
+            const networkContainer = document.getElementById('network');
+            
+            // Create initial devices
+            CONFIG.networkDevices.initialDevices.forEach(device => {
+                const deviceElement = document.createElement('div');
+                deviceElement.className = 'device';
+                deviceElement.id = device.id;
+                deviceElement.textContent = device.name;
+                deviceElement.style.left = `${device.x}px`;
+                deviceElement.style.top = `${device.y}px`;
+                
+                // Apply device-specific styling
+                const metadata = CONFIG.networkDevices.deviceMetadata[device.id];
+                if (metadata) {
+                    const appearance = CONFIG.networkDevices.deviceAppearance[metadata.type] || 
+                                      CONFIG.networkDevices.deviceAppearance.workstation;
+                    deviceElement.style.backgroundColor = appearance.color;
+                    deviceElement.style.color = appearance.textColor;
+                }
+                
+                // Add click handler
+                deviceElement.addEventListener('click', () => {
+                    // Clear previous selection
+                    document.querySelectorAll('.device.selected').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    
+                    // Select current device
+                    deviceElement.classList.add('selected');
+                    updateDeviceInfo(device.id);
+                });
+                
+                networkContainer.appendChild(deviceElement);
+            });
+        }
+
+        /**
+         * Update device information panel
+         * @param {string} deviceId - ID of the device to show info for
+         */
+        function updateDeviceInfo(deviceId) {
+            const infoPanel = document.getElementById('device-info');
+            const metadata = CONFIG.networkDevices.deviceMetadata[deviceId];
+            
+            if (metadata) {
+                let infoHTML = `<strong>${deviceId} (${metadata.name})</strong><br>`;
+                infoHTML += `<small>IP: ${metadata.ip}</small><br>`;
+                infoHTML += `<small>OS: ${metadata.os}</small><br>`;
+                infoHTML += `<small>Security: ${metadata.security}</small>`;
+                
+                // Add beacon status if compromised
+                if (deviceStates[deviceId]) {
+                    const beacon = beaconManager.getBeacon(deviceStates[deviceId].beaconId);
+                    if (beacon) {
+                        infoHTML += `<br><small>Status: <span style="color: #4e9a06;">Compromised</span></small>`;
+                        infoHTML += `<br><small>Beacon: ${beacon.id}</small>`;
+                        infoHTML += `<br><small>Privileges: ${beacon.privilegeLevel}</small>`;
+                    }
+                }
+                
+                infoPanel.innerHTML = infoHTML;
+            } else {
+                infoPanel.textContent = 'Select a device to view details.';
+            }
+        }
+
+        // ==================== UI UPDATES ====================
+
+        /**
+         * Update the listeners panel UI
+         */
+        function updateListenersUI() {
+            const container = document.getElementById('listeners-container');
+            container.innerHTML = '';
+            
+            if (listenerManager.listeners.length === 0) {
+                container.innerHTML = '<p style="color: #777; font-size: 12px;">No active listeners</p>';
+                return;
+            }
+            
+            listenerManager.listeners.forEach(listener => {
+                const listenerElement = document.createElement('div');
+                listenerElement.className = `listener-item ${listener.active ? '' : 'inactive'}`;
+                listenerElement.innerHTML = `
+                    <strong>${listener.type}</strong> (${listener.id})
+                    <div class="listener-details">
+                        ${listener.host}:${listener.port} | Beacons: ${listener.beacons.length}
+                    </div>
+                `;
+                
+                // Add click handler to show listener details
+                listenerElement.addEventListener('click', () => {
+                    logCommand(`[*] Listener ${listener.id} details:\n` +
+                               `Type: ${listener.type}\n` +
+                               `Host: ${listener.host}:${listener.port}\n` +
+                               `Sleep: ${listener.sleep}s\n` +
+                               `Jitter: ${listener.jitter}%\n` +
+                               `Beacons: ${listener.beacons.length}`);
+                });
+                
+                container.appendChild(listenerElement);
+            });
+        }
+
+        /**
+         * Update the beacons panel UI
+         */
+        function updateBeaconsUI() {
+            const container = document.getElementById('beacons-container');
+            container.innerHTML = '';
+            
+            if (beaconManager.beacons.length === 0) {
+                container.innerHTML = '<p style="color: #777; font-size: 12px;">No active beacons</p>';
+                return;
+            }
+            
+            beaconManager.beacons.forEach(beacon => {
+                const beaconElement = document.createElement('div');
+                beaconElement.className = `beacon-item ${beacon.status}`;
+                beaconElement.innerHTML = `
+                    <strong>${beacon.targetId}</strong> (${beacon.id})
+                    <div class="beacon-details">
+                        ${timeSince(beacon.lastCheckin)} ago | ${beacon.privilegeLevel}
+                    </div>
+                `;
+                
+                // Add click handler to interact with beacon
+                beaconElement.addEventListener('click', () => {
+                    logCommand(`[*] Beacon ${beacon.id} details:\n` +
+                               `Target: ${beacon.targetId}\n` +
+                               `Status: ${beacon.status}\n` +
+                               `Last checkin: ${beacon.lastCheckin.toLocaleTimeString()}\n` +
+                               `Privileges: ${beacon.privilegeLevel}\n` +
+                               `Pending tasks: ${beacon.commandQueue.length}`);
+                });
+                
+                container.appendChild(beaconElement);
+            });
+        }
+
+        /**
+         * Helper function to format time since a date
+         * @param {Date} date 
+         * @returns {string} Formatted time string
+         */
+        function timeSince(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            if (seconds < 60) return `${seconds} seconds`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours`;
+            return `${Math.floor(seconds / 86400)} days`;
+        }
+
+        // ==================== COMMAND PROCESSING ====================
+
+        /**
+         * Log a message to the command log
+         * @param {string} message - Message to log
+         */
+        function logCommand(message) {
+            const log = document.getElementById('command-log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = message;
+            
+            // Add timestamp
+            const timestamp = document.createElement('small');
+            timestamp.textContent = new Date().toLocaleTimeString();
+            timestamp.style.color = '#777';
+            entry.prepend(timestamp, ' ');
+            
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            
+            // Clean up old entries
+            const entries = log.querySelectorAll('.log-entry');
+            if (entries.length > CONFIG.ui.maxCommandHistory) {
+                entries[0].remove();
+            }
+            
+            // Auto-remove entries after some time
+            setTimeout(() => {
+                if (entry.parentNode === log) {
+                    entry.remove();
+                }
+            }, CONFIG.ui.logEntryLifetime);
+        }
+
+        /**
+         * Process a command entered in the CLI
+         * @param {string} command - Command to process
+         */
+         function processCommand(command) {
+            if (!command.trim()) return;
+            
+            // Add to history
+            logCommand(`> ${command}`);
+            
+            const parts = command.split(' ');
+            const baseCmd = parts[0].toLowerCase();
+            const args = parts.slice(1);
+            
+            try {
+                // Listener commands
+                if (baseCmd === 'listener') {
+                    if (args[0] === 'start') {
+                        const type = args[1];
+                        const options = {};
+                        
+                        // Parse options (simple key=value parsing)
+                        for (let i = 2; i < args.length; i++) {
+                            const [key, value] = args[i].split('=');
+                            if (key && value) {
+                                options[key] = isNaN(value) ? value : Number(value);
+                            }
+                        }
+                        
+                        listenerManager.createListener(type, options);
+                    } else if (args[0] === 'stop' && args[1]) {
+                        listenerManager.stopListener(args[1]);
+                    } else if (args[0] === 'list') {
+                        if (listenerManager.listeners.length === 0) {
+                            logCommand('[!] No active listeners');
+                        } else {
+                            logCommand('Active listeners:');
+                            listenerManager.listeners.forEach(listener => {
+                                logCommand(`${listener.id} - ${listener.type} on ${listener.host}:${listener.port} (${listener.beacons.length} beacons)`);
+                            });
+                        }
+                    } else {
+                        logCommand('[!] Usage: listener [start <type> [options]|stop <id>|list]');
+                    }
+                }
+                
+                // Beacon commands
+                else if (baseCmd === 'beacon') {
+                    if (args[0] === 'execute' && args[1] && args[2]) {
+                        const beaconId = args[1];
+                        const cmd = args.slice(2).join(' ');
+                        beaconManager.executeCommand(beaconId, cmd);
+                    } else if (args[0] === 'list') {
+                        if (beaconManager.beacons.length === 0) {
+                            logCommand('[!] No active beacons');
+                        } else {
+                            logCommand('Active beacons:');
+                            beaconManager.beacons.forEach(beacon => {
+                                logCommand(`${beacon.id} - ${beacon.targetId} (${beacon.status}, last checkin ${timeSince(beacon.lastCheckin)} ago)`);
+                            });
+                        }
+                    } else {
+                        logCommand('[!] Usage: beacon [execute <id> <command>|list]');
+                    }
+                }
+                
+                // Attack command
+                else if (baseCmd === 'attack' && args.length >= 2) {
+                    const targetId = args[0];
+                    const attackType = args[1].toLowerCase();
+                    
+                    const target = document.getElementById(targetId);
+                    if (!target) {
+                        logCommand(`[!] Error: Target device ${targetId} not found`);
+                        return;
+                    }
+                    
+                    // Simulate different attack types
+                    if (attackType === 'exploit') {
+                        // 70% chance of success for demo purposes
+                        if (Math.random() > 0.3) {
+                            logCommand(`[+] Exploit successful against ${targetId}`);
+                            
+                            // Mark as compromised
+                            deviceStates[targetId] = {
+                                status: 'compromised',
+                                compromisedAt: new Date()
+                            };
+                            
+                            target.classList.add('limited-compromise');
+                            discoverNetwork(targetId);
+                            
+                            // Automatically create beacon if listeners exist
+                            if (listenerManager.listeners.length > 0) {
+                                // Use first active listener
+                                const activeListener = listenerManager.listeners.find(l => l.active);
+                                if (activeListener) {
+                                    beaconManager.createBeacon(activeListener.id, targetId);
+                                }
+                            }
+                        } else {
+                            logCommand(`[!] Exploit failed against ${targetId}`);
+                        }
+                    
+                    } else if (attackType === 'phishing') {
+                        logCommand(`[*] Phishing email sent to ${targetId}`);
+                        logCommand(`[*] Waiting for user interaction...`);
+                        
+                        // Simulate user clicking after some delay
+                        setTimeout(() => {
+                            if (Math.random() > 0.5) { // 50% chance of success
+                                logCommand(`[+] Payload executed on ${targetId}`);
+                                
+                                deviceStates[targetId] = {
+                                    status: 'compromised',
+                                    compromisedAt: new Date()
+                                };
+                                
+                                target.classList.add('limited-compromise');
+                                discoverNetwork(targetId);
+                            } else {
+                                logCommand(`[!] User didn't interact with phishing email`);
+                            }
+                        }, 3000 + Math.random() * 5000);
+                    } else {
+                        logCommand('[!] Unknown attack type. Available: exploit, phishing');
+                    }
+                }
+                
+                // Help command
+                else if (baseCmd === 'help') {
+                    logCommand('Available commands:');
+                    logCommand('listener start <type> [options] - Start a new listener');
+                    logCommand('listener stop <id> - Stop a listener');
+                    logCommand('listener list - List active listeners');
+                    logCommand('beacon execute <id> <command> - Execute command on beacon');
+                    logCommand('beacon list - List active beacons');
+                    logCommand('attack <target> <type> - Attack a target (types: exploit, phishing)');
+                    logCommand('help - Show this help');
+                }
+                
+                // Unknown command
+                else {
+                    logCommand(`[!] Unknown command '${baseCmd}'. Type 'help' for available commands.`);
+                }
+            } catch (error) {
+                logCommand(`[!] Error processing command: ${error.message}`);
+                console.error(error);
+            }
+        }
+
+        /**
+         * Discover new devices connected to a compromised device
+         * @param {string} deviceId - ID of the compromised device
+         */
+        function discoverNetwork(deviceId) {
+            const discoveries = CONFIG.networkDevices.deviceDiscovery[deviceId];
+            if (!discoveries || discoveries.length === 0) return;
+            
+            logCommand(`[*] Discovering network from ${deviceId}...`);
+            
+            // Simulate network discovery delay
+            setTimeout(() => {
+                discoveries.forEach(newDeviceId => {
+                    if (!document.getElementById(newDeviceId)) {
+                        createNewDevice(newDeviceId);
+                    }
+                });
+            }, 1000 + Math.random() * 2000);
+        }
+
+        /**
+         * Create a new network device
+         * @param {string} deviceId - ID of the new device
+         */
+        function createNewDevice(deviceId) {
+            const networkContainer = document.getElementById('network');
+            const metadata = CONFIG.networkDevices.deviceMetadata[deviceId] || {
+                name: deviceId,
+                type: 'workstation',
+                ip: `192.168.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`,
+                os: ['Windows 10', 'Windows 7', 'Linux'][Math.floor(Math.random()*3)],
+                security: ['Firewall enabled', 'AV disabled', 'No protection'][Math.floor(Math.random()*3)]
+            };
+            
+            // Add to metadata if not already present
+            if (!CONFIG.networkDevices.deviceMetadata[deviceId]) {
+                CONFIG.networkDevices.deviceMetadata[deviceId] = metadata;
+            }
+            
+            const deviceElement = document.createElement('div');
+            deviceElement.className = 'device';
+            deviceElement.id = deviceId;
+            deviceElement.textContent = metadata.name;
+            
+            // Position randomly but try to avoid overlaps
+            let x, y;
+            let attempts = 0;
+            const maxAttempts = 20;
+            
+            do {
+                x = Math.random() * (networkContainer.clientWidth - 100) + 50;
+                y = Math.random() * (networkContainer.clientHeight - 100) + 50;
+                attempts++;
+            } while (checkDeviceOverlap(x, y) && attempts < maxAttempts);
+            
+            deviceElement.style.left = `${x}px`;
+            deviceElement.style.top = `${y}px`;
+            
+            // Apply device-specific styling
+            const appearance = CONFIG.networkDevices.deviceAppearance[metadata.type] || 
+                              CONFIG.networkDevices.deviceAppearance.workstation;
+            deviceElement.style.backgroundColor = appearance.color;
+            deviceElement.style.color = appearance.textColor;
+            
+            // Add click handler
+            deviceElement.addEventListener('click', () => {
+                updateDeviceInfo(deviceId);
+            });
+            
+            networkContainer.appendChild(deviceElement);
+            logCommand(`[+] Discovered new device: ${deviceId} (${metadata.name})`);
+        }
+
+        /**
+         * Check if a position would overlap with existing devices
+         * @param {number} x 
+         * @param {number} y 
+         * @returns {boolean} True if overlap would occur
+         */
+        function checkDeviceOverlap(x, y) {
+            const devices = document.querySelectorAll('.device');
+            const padding = 100; // Minimum space between devices
+            
+            for (const device of devices) {
+                const rect = device.getBoundingClientRect();
+                const deviceX = rect.left;
+                const deviceY = rect.top;
+                
+                if (Math.abs(deviceX - x) < padding && Math.abs(deviceY - y) < padding) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        // ==================== INITIALIZATION ====================
+
+        // Create manager instances
+        const listenerManager = new ListenerManager();
+        const beaconManager = new BeaconManager();
+
+        // Initialize the network
+        initializeNetwork();
+
+        // Set up CLI input
+        document.getElementById('cli').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                processCommand(this.value);
+                this.value = '';
+            }
+        });
+
+        // Set up create listener button
+        document.getElementById('create-listener-btn').addEventListener('click', function() {
+            const selectedDevice = document.querySelector('.device.selected');
+            if (!selectedDevice) {
+                logCommand('[!] Please select a compromised device first');
+                return;
+            }
+            
+            if (!deviceStates[selectedDevice.id] || deviceStates[selectedDevice.id].status !== 'compromised') {
+                logCommand('[!] Selected device is not compromised');
+                return;
+            }
+            
+            if (listenerManager.listeners.length === 0) {
+                logCommand('[!] No listeners available - create one first');
+                return;
+            }
+            
+            // Use first active listener
+            const activeListener = listenerManager.listeners.find(l => l.active);
+            if (activeListener) {
+                beaconManager.createBeacon(activeListener.id, selectedDevice.id);
+            } else {
+                logCommand('[!] No active listeners available');
+            }
+        });
+
+        // Periodically update beacon statuses
+        setInterval(() => {
+            beaconManager.updateBeaconStatuses();
+        }, 5000);
+
+        // Initial log message
+        setTimeout(() => {
+            logCommand('C2 Simulation UI initialized');
+            logCommand('Type "help" for available commands');
+        }, 1000);
+    </script>
+</body>
+</html>

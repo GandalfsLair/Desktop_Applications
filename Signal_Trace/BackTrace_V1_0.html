@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signal Trace</title>
+    <style>
+        .node {
+            fill: red;
+        }
+
+        .signal {
+            stroke: blue;
+            stroke-width: 2;
+        }
+
+        body {
+            background-color: black;
+            color: white;
+            text-align: center;
+            font-family: monospace;
+        }
+        .container {
+            position: relative;
+            width: 800px; /* Adjust based on your map */
+            height: 500px;
+            margin: auto;
+            border: 2px solid white;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h2>Press SPACE to Trace the Signal</h2><!--Change title of program here-->
+    <div class="container">
+        <img id="map" src="map1.jpg" alt="Map"> <!--This Map is 800 pixels by 500 pixels. Add name of new map image here. Save in same location as BackTrace code-->
+        <svg id="svg-overlay" width="500" height="500"></svg>
+        <button onclick="traceNextSegment()">Trace Next Segment</button>
+    </div>
+
+<script>
+
+    // Define nodes (ensure this is properly populated)
+    // London 380/190
+    // Chicago 220/190
+    // New York 235/210
+    // San Fran 120/210
+    // LA 125/228
+    // Pyongyang 655/215
+    // Beijing 642/217
+    // Shanghai 647/235
+    // Taipei 650/255
+    // Moscow 453/175
+    // St Petersburg 440/168
+    // Paris 389/200
+    // Berlin 396/197
+    // Lagos, Nigeria 396/299
+    // Tokyo 685/219
+    // Sydney 710/395
+    // Jo'Burg 440/369
+    // Israel 455/235
+    // Rio de Janeiro 285/362
+    // Beunos Aires 265/389
+    // Zurich 397/207
+    // Nicosia 450/235
+    // Dublin 371/190
+    // Bahrain 488/252
+    // Pune 546/267
+    // Fort Meade, NSA 218/220
+     
+    const nodes = [
+        { x: 100, y: 100 },  // Start (Persons doing the tracking)
+        { x: 200, y: 150 },  // Relay Station 1
+        { x: 300, y: 200 },  // Relay Station 2
+        { x: 400, y: 250 },   // Relay Station 3
+        { x: 500, y: 300 },   // Relay Station 4
+        { x: 600, y: 350 }   // End (Location where the hack is coming from)
+    ];
+    const svg = document.getElementById("svg-overlay");
+
+    // Draw nodes
+    nodes.forEach(node => {
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", node.x);
+        circle.setAttribute("cy", node.y);
+        circle.setAttribute("r", 6);
+        circle.setAttribute("class", "node");
+        svg.appendChild(circle);
+    });
+
+    // Draw path (guide path)
+    let pathData = `M ${nodes[0].x},${nodes[0].y} ` + nodes.slice(1).map(n => `L ${n.x},${n.y}`).join(" ");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", pathData);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "gray");
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke-dasharray", "5,5"); // Dotted guide path
+    svg.appendChild(path);
+
+    // Signal line
+    const signal = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    signal.setAttribute("d", "");
+    signal.setAttribute("class", "signal");
+    signal.setAttribute("fill", "none");
+    svg.appendChild(signal);
+
+    let currentSegment = 0;
+    let isAnimating = false;
+
+    // Trace function
+    function traceNextSegment() {
+        console.log("traceNextSegment called");  // Debugging line
+        if (isAnimating || currentSegment >= nodes.length - 1) {
+            return;
+        }
+
+        isAnimating = true;
+
+        const start = nodes[currentSegment];
+        const end = nodes[currentSegment + 1];
+
+        // Animate the signal path between two points (start to end)
+        const signalPathData = `M ${start.x},${start.y} L ${end.x},${end.y}`;
+        signal.setAttribute("d", signalPathData);
+
+        // Update the segment count
+        currentSegment++;
+
+        // Reset animation state after a brief delay to allow time for the path to render
+        setTimeout(() => {
+            isAnimating = false;
+        }, 300); // Adjust delay for smoother animation
+    }
+
+    // Keydown listener to trigger path animation
+    document.addEventListener("keydown", function(event) {
+        if (event.code === "Space") {
+            traceNextSegment();
+        }
+    });
+</script>
+
+</body>
+</html>

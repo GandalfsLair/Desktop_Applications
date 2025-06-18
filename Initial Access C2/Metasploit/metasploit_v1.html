@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exploit_Engine</title>
+    <style>
+        /* ========== GLOBAL STYLES ========== */
+        body {
+            background-color: black;
+            color: #00ff00;
+            font-family: "Courier New", monospace;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* ========== MAIN TERMINAL STYLES ========== */
+        #terminal {
+            width: 80%;
+            max-width: 800px;
+            height: 60vh;
+            background-color: #111;
+            border: 2px solid #00ff00;
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #output {
+            flex-grow: 1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+
+        #input-line {
+            display: flex;
+            align-items: center;
+        }
+
+        #prompt {
+            color: #00ff00;
+            margin-right: 5px;
+        }
+
+        #command-input {
+            background: transparent;
+            border: none;
+            color: #00ff00;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            flex-grow: 1;
+        }
+
+        /* ========== MODAL BASE STYLES ========== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            max-width: 800px;
+            max-height: 90vh;
+            background-color: #222;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            font-family: "Courier New", monospace;
+            box-shadow: 0px 0px 10px #00ff00;
+            overflow: auto;
+        }
+
+        .modal-content {
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        .modal-body {
+            flex-grow: 1;
+            padding: 15px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 10px;
+            background: #111;
+            border-top: 2px solid #00ff00;
+        }
+
+        .modal-footer button {
+            background: black;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .modal-footer button:hover {
+            background: #00ff00;
+            color: black;
+        }
+
+        /* ========== PAYLOAD CREATION MODAL STYLES ========== */
+        #exploit-container {
+            display: flex;
+            gap: 10px;
+            height: 100%;
+        }
+
+        /* Terminal containers */
+        #exploit-terminal-container {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #exploit-terminal {
+            background: black;
+            color: #00ff00;
+            padding: 10px;
+            border: 1px solid #00ff00;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        /* Input lines */
+        #exploit-input-line {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Options containers */
+        #exploit-options-container {
+            flex: 1;
+            background: #111;
+            padding: 10px;
+            border: 1px solid #00ff00;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- ========== MAIN TERMINAL ========== -->
+    <div id="terminal">
+        <div id="output"></div>
+        <div id="input-line">
+            <span id="prompt">msf6 ></span>
+            <input type="text" id="command-input" autofocus>
+        </div>
+    </div>
+
+    <!-- ========== MODALS ========== -->
+    
+    <!-- PAYLOAD CREATION MODAL -->
+    <div id="create-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div id="exploit-container">
+                    <div id="exploit-terminal-container">
+                        <p>Payload Creation Mode - Enter Exploit Commands Below:</p>
+                        <div id="exploit-terminal">
+                            <pre id="exploit-output"></pre>
+                            <div id="exploit-input-line">
+                                <span id="exploit-prompt">exploit > </span>
+                                <input type="text" id="exploit-command-input" autofocus>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="exploit-options-container">
+                        <h3>Current Exploit Configuration:</h3>
+                        <div id="exploit-options-box">
+                            <pre id="exploit-settings">No options set.</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="test-button">TEST</button>
+                <button class="shell-button" onclick="openShellWindow1()">SHELL</button>
+                <button id="close-modal">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAYLOAD TEST MODAL -->
+    <div id="test-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-body">
+                <h3>Test Environment Setup</h3>
+                <form id="test-form">
+                    <label for="os">Operating System:</label>
+                    <select id="os" name="os">
+                        <option value="Windows">Windows</option>
+                        <option value="Linux">Linux</option>
+                        <option value="macOS">macOS</option>
+                    </select>
+                    <br><br>
+                    <label for="firewall">Is Firewall Present?</label>
+                    <select id="firewall" name="firewall">
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
+                    <br><br>
+                    <div id="firewall-details" style="display:none;">
+                        <label for="firewall-model">Firewall Make &amp; Model:</label>
+                        <input type="text" id="firewall-model" name="firewall-model" placeholder="e.g., Cisco ASA">
+                    </div>
+                    <br>
+                    <label for="antivirus">Antivirus Enabled?</label>
+                    <select id="antivirus" name="antivirus">
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
+                    <br><br>
+                    <div id="av-details" style="display:none;">
+                        <label for="av-model">Antivirus Manufacturer:</label>
+                        <input type="text" id="av-model" name="av-model" placeholder="e.g., Norton, McAfee">
+                    </div>
+                </form>
+                <div id="test-results" style="margin-top:15px; white-space: pre-wrap;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="run-test-button">Run Test</button>
+                <button id="cancel-test-button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== GLOBAL VARIABLES ==========
+        const modules = [
+            
+        //AUXILLIARY/
+        { name: "auxiliary/scanner/ssh/ssh_login", description: "SSH Login Scanner/Brute Force", options: ["RHOSTS", "USERNAME", "PASS_FILE", "THREADS"] },
+        { name: "auxiliary/scanner/http/wp_plugin_check", description: "WordPress Plugin Vulnerability Scanner", options: ["RHOSTS", "TARGETURI", "PLUGINS"] },
+        { name: "auxiliary/gather/office365_phish", description: "Office 365 Phishing Campaign Generator", options: ["TEMPLATE", "TARGET_EMAILS", "REDIRECT_URL", "EMAIL_SUBJECT", "SENDER_NAME"] },
+
+            //WINDOWS
+        { name: "exploit/windows/API_pivot", description: "Pivot via vulnerable API", options: ["RHOST", "RPORT", "LHOST", "LPORT" , "TARGETURI", "OUTPUT"] },
+        { name: "exploit/windows/smb/ms17_010", description: "EternalBlue exploit", options: ["RHOST", "LPORT", "PAYLOAD", "OUTPUT"] },
+        { name: "exploit/windows/relay/proxy_rce", description: "Windows Proxy Relay", options: ["RHOST", "RPORT", "LHOST", "LPORT", "PASSWORD", "OUTPUT"] },    
+        { name: "exploit/windows/rdp/cve_2019_0708", description: "BlueKeep RDP Remote Code Execution", options: ["RHOST", "PAYLOAD", "OUTPUT"] },
+        { name: "exploit/windows/smb/psexec", description: "PsExec Service Abuse", options: ["RHOST", "SMBUSER", "SMBPASS", "PAYLOAD"] },
+        { name: "exploit/windows/local/cve_2021_34527", description: "Windows Print Spooler Privilege Escalation", options: ["SESSION", "PAYLOAD", "OUTPUT"] },
+        { name: "exploit/windows/http/exchange_proxyshell", description: "Microsoft Exchange ProxyShell RCE", options: ["RHOST", "EMAIL", "PAYLOAD", "OUTPUT"] },
+
+            //LINUX
+        { name: "exploit/linux/http/apache_struts", description: "Apache Struts RCE", options: ["LHOST", "LPORT", "PAYLOAD", "OUTPUT"] },
+        { name: "exploit/linux/relay/proxy_rce", description: "Linux Proxy Relay", options: ["RHOST", "RPORT", "LHOST", "LPORT", "PASSWORD", "OUTPUT"] },
+        { name: "exploit/linux/http/nginx_chunked_overflow", description: "NGINX Chunked Encoding Stack Overflow", options: ["RHOST", "RPORT", "PAYLOAD", "OUTPUT"] },
+            
+            //UNIX
+        { name: "exploit/unix/webapp/wp_admin_shell_upload", description: "WordPress Admin Shell Upload", options: ["RHOST", "USERNAME", "PASSWORD", "PAYLOAD"] },
+
+            //MACOS
+        { name: "exploit/macos/ssh/rootkit", description: "SSH Rootkit", options: ["RHOST", "RPORT", "PAYLOAD", "OUTPUT"] },
+        { name: "exploit/macos/relay/proxy_rce", description: "MacOS Proxy Relay", options: ["RHOST", "RPORT", "LHOST", "LPORT", "PASSWORD", "OUTPUT"] },
+
+            //IOS
+        { name: "exploit/ios/webkit/safari_rce", description: "iOS Safari RCE", options: ["LHOST","PAYLOAD", "OUTPUT"]},
+        { name: "exploit/ios/relay/proxy_rce", description: "iOS Proxy Relay", options: ["RHOST", "RPORT", "LHOST", "LPORT", "PASSWORD", "OUTPUT"] },
+
+            //ANDROID
+        { name: "exploit/android/adb/debug_mode", description: "ADB Debug Mode Exploit", options: ["LPORT", "PAYLOAD", "OUTPUT"] },
+        { name: "exploit/android/relay/proxy_rce", description: "Android Proxy Relay", options: ["RHOST", "RPORT", "LHOST", "LPORT", "PASSWORD", "OUTPUT"] },
+        { name: "exploit/android/adb/root_access", description: "Android ADB Root Access Exploit", options: ["RHOST", "PAYLOAD", "OUTPUT"] },
+
+            //MULTI
+        { name: "exploit/multi/phishing/doc_exploit", description: "Malicious Document Generator", options: ["TEMPLATE", "EXPLOIT", "OUTPUT", "EMAIL_LIST"] },
+        { name: "exploit/multi/http/log4j_rce", description: "Log4Shell Remote Code Execution", options: ["RHOST", "RPORT", "TARGETURI", "PAYLOAD", "OUTPUT"] },
+        { name: "exploit/multi/http/jenkins_script_console", description: "Jenkins Script Console RCE", options: ["RHOST", "RPORT", "USERNAME", "PASSWORD", "PAYLOAD"] },
+        { name: "exploit/multi/http/rails_deserialization", description: "Ruby on Rails XML Deserialization RCE", options: ["RHOST", "TARGETURI", "PAYLOAD"] },
+        { name: "exploit/multi/handler", description: "Generic Payload Handler", options: ["LHOST", "LPORT", "RHOST", "RPORT", "PAYLOAD"] },
+    ];
+
+        let selectedModule = null;
+        let options = {
+            LHOST: "(not set)",
+            LPORT: "(not set)",
+            RHOST: "(not set)",
+            RPORT: "(not set)",
+            SMBUSER: "(not set)",
+            SMBPASS: "(not set)",
+            PAYLOAD: "(not set)",
+            OUTPUT: "payload.bin",
+            TEMPLATE: "default",
+            TARGET_EMAILS: "(not set)",
+            EMAIL: "(not set)",
+            EMAIL_LIST: "(not set)",
+            REDIRECT_URL: "(not set)",
+            PLUGINS: "(not set)",
+            TARGETURI: "(not set)",
+            PASSWORD: "(not set)",
+            PASS_FILE: "(not set)",
+            THREADS: "(not set)",
+            SESSION: "(not set)",
+            USERNAME: "(not set)",        
+            EMAIL_SUBJECT: "(not set)",
+            SENDER_NAME: "(not set)",
+            EMAIL_BODY: "(not set)",
+            ATTACHMENT_NAME: "(not set)"
+        };
+
+        // ========== MAIN TERMINAL FUNCTIONALITY ==========
+        document.addEventListener("DOMContentLoaded", function () {
+            const inputField = document.getElementById("command-input");
+            const outputDiv = document.getElementById("output");
+
+            function processCommand(command) {
+                let response = "";
+                
+                if (command === "show modules") {
+                    response = "Available Modules:";
+                    modules.forEach((mod, index) => {
+                        response += `\n${index + 1}. ${mod.name} - ${mod.description}`;
+                    });
+                } 
+                else if (command.startsWith("use ")) {
+                    let moduleArg = command.split(" ")[1];
+                    if (!isNaN(moduleArg)) {
+                        let moduleIndex = parseInt(moduleArg, 10) - 1;
+                        if (modules[moduleIndex]) {
+                            selectedModule = modules[moduleIndex];
+                            response = `Using module: ${selectedModule.name}\nDescription: ${selectedModule.description}`;
+                        } else {
+                            response = `Error: Module number '${moduleArg}' not found.`;
+                        }
+                    } else {
+                        selectedModule = modules.find(m => m.name === moduleArg);
+                        response = selectedModule ? `Using module: ${selectedModule.name}\nDescription: ${selectedModule.description}` : `Error: Module '${moduleArg}' not found.`;
+                    }
+                } 
+                else if (command === "show options") {
+                    if (selectedModule) {
+                        response = `Options for ${selectedModule.name}:\n`;
+                        selectedModule.options.forEach(opt => {
+                            response += `- ${opt}: ${options[opt] || "(not set)"}\n`;
+                        });
+                    } else {
+                        response = "No module selected.";
+                    }
+                } 
+                else if (command.startsWith("search options ")) {
+                    let searchOption = command.split(" ")[2].toUpperCase();
+                    let filteredModules = modules.filter(m => m.options.includes(searchOption));
+                    response = filteredModules.length ? `Modules requiring '${searchOption}':\n${filteredModules.map(m => `${m.name} - ${m.description}`).join("\n")}` : `No modules found requiring '${searchOption}'.`;
+                } 
+                else if (command.startsWith("set ")) {
+                    let [key, ...valueParts] = command.split(" ").slice(1);
+                    let value = valueParts.join(" ");
+                    if (options.hasOwnProperty(key.toUpperCase())) {
+                        options[key.toUpperCase()] = value;
+                        response = `${key.toUpperCase()} set to ${value}`;
+                    } else {
+                        response = `Invalid option: ${key}`;
+                    }
+                } 
+
+                else if (command === "show templates") {
+    response = "Available Phishing Templates:\n";
+    response += "==========================\n";
+    response += "1. default       - Generic Office 365 login page\n";
+    response += "2. document      - 'Your document is ready' lure\n";
+    response += "3. security      - 'Security alert' notification\n";
+    response += "4. payroll       - 'Payroll update required'\n";
+    response += "5. meeting      - 'Meeting invitation' lure\n";
+    response += "\nUse 'set TEMPLATE <name>' to select a template";
+}
+
+else if (command.startsWith("set TEMPLATE ")) {
+    const templateName = command.split(" ")[2];
+    const validTemplates = ["default", "document", "security", "payroll", "meeting"];
+    
+    if (validTemplates.includes(templateName)) {
+        options.TEMPLATE = templateName;
+        response = `Template set to: ${templateName}`;
+        
+        // Set template-specific defaults
+        if (templateName === "document") {
+            if (options.EMAIL_SUBJECT === "(not set)") {
+                options.EMAIL_SUBJECT = "Your document is ready for review";
+            }
+        }
+        else if (templateName === "security") {
+            if (options.EMAIL_SUBJECT === "(not set)") {
+                options.EMAIL_SUBJECT = "URGENT: Security alert on your account";
+            }
+        }
+    } else {
+        response = `Invalid template. Available templates: ${validTemplates.join(", ")}`;
+    }
+}
+                
+            // Add command processing
+                else if (command === "send phishing") {
+                    response = "Sending phishing emails to 42 targets...";
+                        outputResponse(response);
+                        setTimeout(() => {
+                        outputResponse("[***       ] Crafting documents...");
+                            }, 1000);
+                            setTimeout(() => {
+                            outputResponse("[******    ] Delivering payloads...");
+                            }, 2000);
+                                setTimeout(() => {
+                                outputResponse("[********* ] 3 targets opened document");
+                                }, 3000);
+}
+
+    // Add these new conditionals to handle specific modules
+    else if (command === "exploit" && selectedModule) {
+        if (selectedModule.name === "exploit/multi/http/log4j_rce") {
+            response = "Exploiting Log4Shell vulnerability...";
+            outputResponse(response);
+            setTimeout(() => {
+                outputResponse(`Sending JNDI payload to ${options.RHOST}`);
+            }, 1000);
+            setTimeout(() => {
+                outputResponse("[*] Triggering LDAP callback");
+            }, 2000);
+            setTimeout(() => {
+                outputResponse("[+] Exploit completed successfully - shell opened!");
+            }, 3000);
+            return;
+        }
+
+        else if (command === "exploit" && selectedModule && selectedModule.name === "exploit/multi/handler") {
+    if (selectedModule) {
+        let missingOptions = selectedModule.options.filter(opt => options[opt] === "(not set)");
+        if (missingOptions.length > 0) {
+            response = `Exploitation failed: Missing required options - ${missingOptions.join(", ")}.`;
+            outputResponse(response);
+        } else {
+            response = "Starting payload handler...";
+            outputResponse(response);
+            
+            setTimeout(() => {
+                outputResponse("[**        ] Payload handler started on " + 
+                             `${options.LHOST}:${options.LPORT}`);
+            }, 1000);
+            
+            setTimeout(() => {
+                outputResponse("[****      ] Waiting for incoming connection...");
+            }, 2000);
+            
+            setTimeout(() => {
+                outputResponse("[******    ] Awaiting callback from target...");
+                
+                // Create a promise that resolves when Enter is pressed
+                const enterPressed = new Promise((resolve) => {
+                    const handleKeyPress = (e) => {
+                        if (e.key === 'Enter') {
+                            document.removeEventListener('keydown', handleKeyPress);
+                            resolve('keypress');
+                        }
+                    };
+                    document.addEventListener('keydown', handleKeyPress);
+                });
+                
+                // Create a promise that resolves after 10 seconds
+                const timeout = new Promise((resolve) => {
+                    setTimeout(() => resolve('timeout'), 10000);
+                });
+                
+                // Race between the two promises
+                Promise.race([enterPressed, timeout]).then((result) => {
+                    if (result === 'keypress') {
+                        outputResponse(`[********  ] Callback received from ${options.RHOST}:${options.RPORT}`);
+                    } else {
+                        outputResponse("[********  ] Callback received!");
+                    }
+                    
+                    setTimeout(() => {
+                        outputResponse("[**********] Session established!");
+                        outputResponse("Type 'sessions -m' to list multi handler activesessions ");
+                    }, 1000);
+                });
+                
+            }, 3000);
+        }
+    } else {
+        response = "No module selected. Use 'use <module>' to select one.";
+        outputResponse(response);
+    }
+    return;
+}
+
+        else if (selectedModule.name === "exploit/windows/http/exchange_proxyshell") {
+            response = "Exploiting Microsoft Exchange ProxyShell...";
+            outputResponse(response);
+            setTimeout(() => {
+                outputResponse(`[*] Authenticating to Exchange as ${options.EMAIL}`);
+            }, 1000);
+            setTimeout(() => {
+                outputResponse("[*] Bypassing ACLs via ProxyShell chain");
+            }, 2000);
+            setTimeout(() => {
+                outputResponse("[+] Mailbox access obtained - deploying payload");
+            }, 3000);
+            return;
+        }
+        else if (selectedModule.name === "auxiliary/scanner/ssh/ssh_login") {
+            response = "Starting SSH brute force attack...";
+            outputResponse(response);
+            setTimeout(() => {
+                outputResponse(`[*] Trying 50 common passwords against ${options.RHOST}`);
+            }, 1000);
+            setTimeout(() => {
+                outputResponse("[+] Success! Valid credentials: admin:Password123");
+            }, 3000);
+            return;
+        }
+        
+        else if (selectedModule.name === "exploit/windows/local/cve_2021_34527") {
+            response = "Exploiting Windows Print Spooler vulnerability...";
+            outputResponse(response);
+            setTimeout(() => {
+                outputResponse("[*] Spooling malicious print job");
+            }, 1000);
+            setTimeout(() => {
+                outputResponse("[*] Triggering privilege escalation");
+            }, 2000);
+            setTimeout(() => {
+                outputResponse("[+] SYSTEM privileges obtained!");
+            }, 3000);
+            return;
+        }
+        else if (selectedModule.name === "exploit/windows/smb/ms17_010") {
+    response = "Exploiting EternalBlue vulnerability...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Target OS: Windows 7 SP1 (build ${Math.floor(1000 + Math.random() * 9000)})`);
+    }, 500);
+    setTimeout(() => {
+        outputResponse(`[*] Building exploit buffer for ${options.RHOST}`);
+    }, 1500);
+    setTimeout(() => {
+        outputResponse(`[+] ${randomIP()} - Exploit completed successfully!`);
+    }, 3000);
+    return;
+}
+
+else if (selectedModule.name === "exploit/windows/API_pivot") {
+    response = "Exploiting Vulnerable API...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Building attack code for ${options.RHOST} on ${options.RPORT}`);
+    }, 500);
+    setTimeout(() => {
+        outputResponse(`[*] Injecting into ${options.TARGETURI}`);
+    }, 1500);
+    setTimeout(() => {
+        outputResponse(`[+] Exploit completed. Connection to ${options.LHOST} on ${options.LPORT}`);
+    }, 3000);
+    return;
+}
+
+else if (selectedModule.name === "exploit/linux/http/apache_struts") {
+    response = "Exploiting Apache Struts vulnerability...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Sending OGNL payload to ${options.RHOST}`);
+    }, 1000);
+    setTimeout(() => {
+        outputResponse(`[*] Triggering expression evaluation`);
+    }, 2000);
+    setTimeout(() => {
+        outputResponse(`[+] Command execution successful on ${randomHostname()}`);
+    }, 3000);
+    return;
+}
+
+// Add this to the existing processCommand function where other exploit cases are handled
+else if (selectedModule.name === "exploit/macos/ssh/rootkit") {
+    response = "Exploiting macOS SSH rootkit vulnerability...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Connecting to SSH service on ${options.RHOST}:${options.RPORT}`);
+    }, 800);
+    setTimeout(() => {
+        outputResponse("[*] Uploading rootkit payload via SSH");
+    }, 1800);
+    setTimeout(() => {
+        outputResponse("[+] Rootkit installed! Maintaining persistent access");
+    }, 3000);
+    return;
+}
+else if (selectedModule.name === "exploit/ios/webkit/safari_rce") {
+    response = "Exploiting iOS Safari WebKit vulnerability...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Sending malicious JavaScript to ${options.LHOST}`);
+    }, 800);
+    setTimeout(() => {
+        outputResponse("[*] Triggering memory corruption via crafted page");
+    }, 1800);
+    setTimeout(() => {
+        outputResponse("[+] Code execution achieved! Deploying stage 2 payload");
+    }, 3000);
+    return;
+}
+else if (selectedModule.name === "exploit/android/adb/debug_mode") {
+    response = "Exploiting Android ADB debug mode...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse("[*] Connecting to ADB interface");
+    }, 800);
+    setTimeout(() => {
+        outputResponse("[*] Uploading and executing payload");
+    }, 1800);
+    setTimeout(() => {
+        outputResponse("[+] Root shell obtained!");
+    }, 3000);
+    return;
+}
+else if (selectedModule.name.startsWith("exploit/") && selectedModule.name.includes("/relay/proxy_rce")) {
+    const os = selectedModule.name.split("/")[1];
+    response = `Exploiting ${os} proxy relay vulnerability...`;
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Connecting to proxy at ${options.RHOST}:${options.RPORT}`);
+    }, 800);
+    setTimeout(() => {
+        outputResponse("[*] Injecting relay payload");
+    }, 1800);
+    setTimeout(() => {
+        outputResponse(`[+] Relay established! Connecting back to ${options.LHOST}:${options.LPORT}`);
+    }, 3000);
+    return;
+}
+else if (selectedModule.name === "exploit/unix/webapp/wp_admin_shell_upload") {
+    response = "Exploiting WordPress admin shell upload...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Authenticating as ${options.USERNAME}`);
+    }, 800);
+    setTimeout(() => {
+        outputResponse("[*] Uploading malicious plugin");
+    }, 1800);
+    setTimeout(() => {
+        outputResponse("[+] Web shell installed at /wp-content/plugins/malicious/shell.php");
+    }, 3000);
+    return;
+}
+else if (selectedModule.name === "exploit/multi/http/rails_deserialization") {
+    response = "Exploiting Ruby on Rails XML deserialization...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Sending crafted XML to ${options.RHOST}${options.TARGETURI}`);
+    }, 800);
+    setTimeout(() => {
+        outputResponse("[*] Triggering deserialization vulnerability");
+    }, 1800);
+    setTimeout(() => {
+        outputResponse("[+] Remote code execution achieved!");
+    }, 3000);
+    return;
+}
+else if (selectedModule.name === "exploit/windows/rdp/cve_2019_0708") {
+    response = "Exploiting BlueKeep RDP vulnerability...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Targeting RDP service on ${options.RHOST}`);
+    }, 800);
+    setTimeout(() => {
+        outputResponse("[*] Sending specially crafted RDP packets");
+    }, 1800);
+    setTimeout(() => {
+        outputResponse("[+] Exploit successful! SYSTEM-level access obtained");
+    }, 3000);
+    return;
+}
+
+else if (selectedModule.name === "exploit/multi/phishing/doc_exploit") {
+    response = "Generating malicious document template...";
+    outputResponse(response);
+    setTimeout(() => {
+        outputResponse(`[*] Crafting email from ${options.TEMPLATE} template...`);
+    }, 1000);
+    setTimeout(() => {
+        outputResponse(`[*] Embedding payload ${options.PAYLOAD} into template...`);
+    }, 2000);
+    setTimeout(() => {
+        outputResponse(`[+] Phishing emails ready for delivery to ${options.TARGET_EMAILS}`);
+    }, 3000);
+    return;
+}
+
+else if (selectedModule.name === "auxiliary/gather/office365_phish") {
+    response = "Generating Office 365 phishing campaign...\n";
+    response += `Using template: ${options.TEMPLATE}\n`;
+    response += `Target emails: ${options.TARGET_EMAILS}\n`;
+    outputResponse(response);
+    
+    setTimeout(() => {
+        outputResponse("[*] Building email template components...");
+    }, 800);
+    
+    setTimeout(() => {
+        let templateSpecific = "";
+        switch(options.TEMPLATE) {
+            case "document":
+                templateSpecific = "Creating document preview and download link...";
+                break;
+            case "security":
+                templateSpecific = "Generating security alert graphics...";
+                break;
+            case "payroll":
+                templateSpecific = "Creating payroll update form...";
+                break;
+            default:
+                templateSpecific = "Configuring Office 365 login page clone...";
+        }
+        outputResponse(`[*] ${templateSpecific}`);
+    }, 1800);
+    
+    setTimeout(() => {
+        outputResponse("[*] Setting up tracking and redirection...");
+    }, 2800);
+    
+    setTimeout(() => {
+        outputResponse("[+] Phishing campaign ready!");
+        outputResponse(`    Emails will appear from: ${options.SENDER_NAME || "IT Support"}`);
+        outputResponse(`    Subject line: ${options.EMAIL_SUBJECT}`);
+        outputResponse(`    Credentials will be captured at: ${options.REDIRECT_URL}`);
+    }, 4000);
+    return;
+        }
+        // Default exploit behavior for other modules
+        else {
+            // Your existing exploit code here
+        }
+    }
+
+    else if (command === "show template") {
+    if (!selectedModule || selectedModule.name !== "auxiliary/gather/office365_phish") {
+        response = "This command only works with the office365_phish module";
+    } else {
+        response = `Current Template: ${options.TEMPLATE}\n`;
+        response += "==========================\n";
+        
+        switch(options.TEMPLATE) {
+            case "document":
+                response += "Subject: Your document is ready for review\n";
+                response += "Content: 'Please review the attached document'\n";
+                response += "Contains: Fake document download link";
+                break;
+            case "security":
+                response += "Subject: URGENT: Security alert on your account\n";
+                response += "Content: 'Your account shows suspicious activity'\n";
+                response += "Contains: Fake login button to 'secure your account'";
+                break;
+            case "payroll":
+                response += "Subject: Payroll update required\n";
+                response += "Content: 'Please confirm your payment details'\n";
+                response += "Contains: Fake payroll form";
+                break;
+            default:
+                response += "Subject: Office 365 login required\n";
+                response += "Content: 'You need to re-authenticate your account'\n";
+                response += "Contains: Office 365 login page clone";
+        }
+    }
+}
+
+else if (command === "exploit" && selectedModule.name === "auxiliary/gather/office365_phish") {
+    const required = ["TARGET_EMAILS", "REDIRECT_URL"];
+    const missing = required.filter(opt => options[opt] === "(not set)");
+    
+    if (missing.length > 0) {
+        response = `Missing required options: ${missing.join(", ")}`;
+    } else {
+        // Run the phishing exploit as shown earlier
+    }
+}
+                else if (command === "generate") {
+                    if (selectedModule) {
+                        response = "Generating payload...";
+                        //outputResponse(response);
+
+                        setTimeout(() => {
+                            outputResponse("[****      ] Preparing...");
+                        }, 1000);
+                        setTimeout(() => {
+                            outputResponse("[*******   ] Encoding...");
+                        }, 2000);
+                        setTimeout(() => {
+                            outputResponse(`[**********] Payload generated: ${options["OUTPUT"]}`);
+                        }, 3000);
+                    } else {
+                        response = "No module selected. Use 'use <module>' to select one.";
+                    }
+                } 
+
+                else if (command === "check") {
+    if (!selectedModule) {
+        response = "No module selected";
+    } else {
+        response = `Checking if target is vulnerable to ${selectedModule.name}...`;
+        outputResponse(response);
+        setTimeout(() => {
+            outputResponse("[*] Scanning target...");
+        }, 1000);
+        setTimeout(() => {
+            outputResponse(Math.random() > 0.3 ? 
+                "[+] Target appears vulnerable!" : 
+                "[-] Target does not appear vulnerable");
+        }, 2500);
+        return;
+    }
+}
+else if (command === "hosts") {
+    response = "Hosts:\n======\n";
+    for (let i = 0; i < 5; i++) {
+        const ip = randomIP();
+        response += `${ip.padEnd(15)} ${randomMac()} ${randomHostname()}\n`;
+    }
+}
+else if (command === "creds") {
+    response = "Credentials:\n===========\n";
+    const services = ["SSH", "RDP", "HTTP", "SMB", "FTP"];
+    const users = ["admin", "root", "user", "guest", "backup"];
+    const passwords = ["password", "Password123", "admin", "welcome", "123456"];
+    
+    for (let i = 0; i < 3; i++) {
+        response += `${services[Math.floor(Math.random() * services.length)]} ` +
+                    `${users[Math.floor(Math.random() * users.length)]}:` +
+                    `${passwords[Math.floor(Math.random() * passwords.length)]}\n`;
+    }
+}
+
+                else if (command === "clear") {
+                    outputDiv.innerHTML = "";
+                    response = "Screen cleared.";
+                } 
+                else if (command === "store") {
+                    response = "Data copied to storage area.";
+                } 
+                else if (command === "load") {
+                    response = "Data loaded from storage area.";
+                } 
+                else if (command === "setup") {
+                    response = "SETUP command received. Functionality not yet implemented.";
+                } 
+                else if (command === "payload") {
+                    document.getElementById("create-modal").style.display = "block";
+                    response = "Entering Payload Creation Mode...";
+                } 
+                else if (command === "exploit") {
+                    if (selectedModule) {
+                        let missingOptions = selectedModule.options.filter(opt => options[opt] === "(not set)");
+                        if (missingOptions.length > 0) {
+                            response = `Exploitation failed: Missing required options - ${missingOptions.join(", ")}.`;
+                        } else {
+                            response = "Starting exploitation...";
+                            outputResponse(response);
+                            setTimeout(() => {
+                                outputResponse("[****      ] Establishing connection...");
+                            }, 1000);
+                            setTimeout(() => {
+                                outputResponse("[*******   ] Sending payload...");
+                            }, 2000);
+                            setTimeout(() => {
+                                outputResponse("[**********] Exploitation successful!");
+                            }, 3000);
+                            return;
+                        }
+                    } else {
+                        response = "No module selected. Use 'use <module>' to select one.";
+                    }
+                } 
+
+                    // Add this new command for showing sessions
+    else if (command === "sessions -l") {
+        response = "Active sessions:\n";
+        response += "===============\n";
+        response += "  Id  Type        Information\n";
+        response += "  --  ----        -----------\n";
+        response += "  1   shell x64   WIN-7A3K9E1 (192.168.1.105)\n";
+        response += "  2   meterpreter WIN-ADMIN (10.0.2.15)";
+    }
+
+    else if (command === "sessions -m") {
+        response = "Active sessions (multi handler):\n";
+        response += "===============\n";
+        response += "  Id  Type        Information\n";
+        response += "  --  ----        -----------\n";
+        response += `  1   shell x64   WIN-7A3K9E1 (${options.RHOST})\n`;
+        response += "===============\n";
+        response += "Type 'sessions -mi' to interact with session\n";
+    }
+    
+    // Add this new command for interacting with sessions
+    else if (command.startsWith("sessions -i ")) {
+        const sessionId = command.split(" ")[2];
+        response = `Interacting with session ${sessionId}\n`;
+        response += "Type 'exit' to return to the main console\n";
+        response += "C:\\Windows\\system32> ";
+    }
+
+    outputResponse(response);
+}
+
+function randomIP() {
+    return `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+}
+
+function randomMac() {
+    const hex = "0123456789ABCDEF";
+    let mac = "";
+    for (let i = 0; i < 6; i++) {
+        mac += hex[Math.floor(Math.random() * 16)] + hex[Math.floor(Math.random() * 16)];
+        if (i < 5) mac += ":";
+    }
+    return mac;
+}
+
+function randomHostname() {
+    const prefixes = ["WIN-", "SRV-", "DESKTOP-", "LAPTOP-", "DC-"];
+    const suffixes = ["01", "02", "ADMIN", "USER", "BACKUP", "FS", "MAIL"];
+    return prefixes[Math.floor(Math.random() * prefixes.length)] + 
+           suffixes[Math.floor(Math.random() * suffixes.length)] + 
+           Math.floor(Math.random() * 10);
+}
+
+            function outputResponse(response) {
+                response.split("\n").forEach(line => {
+                    const responseDiv = document.createElement("div");
+                    responseDiv.textContent = line;
+                    outputDiv.appendChild(responseDiv);
+                });
+                outputDiv.scrollTop = outputDiv.scrollHeight;
+            }
+
+            inputField.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    const command = inputField.value.trim();
+                    if (command) {
+                        outputResponse(`msf6 > ${command}`);
+                        processCommand(command);
+                        inputField.value = "";
+                    }
+                }
+            });
+        });
+
+        // ========== PAYLOAD CREATION MODAL FUNCTIONALITY ==========
+        document.addEventListener("DOMContentLoaded", function () {
+            const createModal = document.getElementById("create-modal");
+            const testModal = document.getElementById("test-modal");
+            const closeModalBtn = document.getElementById("close-modal");
+            const testButton = document.getElementById("test-button");
+            const runTestButton = document.getElementById("run-test-button");
+            const cancelTestButton = document.getElementById("cancel-test-button");
+            const exploitInputField = document.getElementById("exploit-command-input");
+            const exploitOutputDiv = document.getElementById("exploit-output");
+            const exploitSettingsDiv = document.getElementById("exploit-settings");
+            const firewallSelect = document.getElementById("firewall");
+            const firewallDetails = document.getElementById("firewall-details");
+            const testResultsDiv = document.getElementById("test-results");
+
+            // Initialize global exploit config if not exists
+            if (!window.exploitConfig) {
+                window.exploitConfig = {};
+            }
+
+            // Event listeners for form elements
+            firewallSelect.addEventListener("change", function () {
+                document.getElementById("firewall-details").style.display = firewallSelect.value === "Yes" ? "block" : "none";
+            });
+
+            document.getElementById("antivirus").addEventListener("change", function () {
+                document.getElementById("av-details").style.display = this.value === "Yes" ? "block" : "none";
+            });
+
+            // Payload creation functions
+            function updateExploitSettings() {
+                exploitSettingsDiv.textContent = JSON.stringify(window.exploitConfig, null, 2);
+            }
+
+            function processExploitCommand(command) {
+                let response = "";
+                const parts = command.split(" ");
+                const cmd = parts[0];
+
+                if (cmd === "load") {
+                    response = "Data Loaded from Storage Area."
+                }
+                else if (cmd === "store") {
+                    response = "Data Stored in Storage Area."    
+                }
+                else if (cmd === "set" && parts.length >= 3) {
+                    let key = parts[1].toUpperCase();
+                    let value = parts.slice(2).join(" ");
+                    window.exploitConfig[key] = value;
+                    response = `${key} set to ${value}`;
+                    updateExploitSettings();
+                } else {
+                    response = `Unknown command: ${command}`;
+                }
+                outputExploitResponse(response);
+            }
+
+            function outputExploitResponse(response) {
+                const responseDiv = document.createElement("div");
+                responseDiv.textContent = response;
+                exploitOutputDiv.appendChild(responseDiv);
+            }
+
+            // Button event handlers
+            testButton.addEventListener("click", function () {
+                testModal.style.display = "block";
+                testResultsDiv.textContent = "";
+            });
+
+            runTestButton.addEventListener("click", function () {
+                testResultsDiv.textContent = "Starting test...\n";
+                setTimeout(() => {
+                    testResultsDiv.textContent += "Configuring environment...\n";
+                }, 1000);
+                setTimeout(() => {
+                    let success = false;
+                    let firewallEnabled = document.getElementById("firewall").value === "Yes";
+                    let antivirusEnabled = document.getElementById("antivirus").value === "Yes";
+                    let firewallBypassed = window.exploitConfig["FIREWALL_EVASION"] ? true : false;
+                    let antivirusBypassed = window.exploitConfig["BYPASS_AV"] ? true : false;
+                    let stealthMode = window.exploitConfig["EXPLOIT_MODE"] === "stealth";
+
+                    if (stealthMode) {
+                        success = true;
+                    } else if (firewallEnabled && antivirusEnabled) {
+                        success = firewallBypassed && antivirusBypassed;
+                    } else if (firewallEnabled) {
+                        success = firewallBypassed;
+                    } else if (antivirusEnabled) {
+                        success = antivirusBypassed;
+                    } else {
+                        success = true;
+                    }
+                    testResultsDiv.textContent += success 
+                        ? "Exploit test succeeded: Vulnerability exploited successfully!" 
+                        : "Exploit test failed: Environment defenses blocked the payload.";
+                }, 2000);
+            });
+
+            closeModalBtn.addEventListener("click", function () {
+                createModal.style.display = "none";
+            });
+
+            cancelTestButton.addEventListener("click", function () {
+                testModal.style.display = "none";
+            });
+
+            exploitInputField.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    const command = exploitInputField.value.trim();
+                    if (command) {
+                        outputExploitResponse(`exploit > ${command}`);
+                        processExploitCommand(command);
+                        exploitInputField.value = "";
+                    }
+                }
+            });
+        });
+
+        // ========== SHELL WINDOW FUNCTIONS ==========
+        function openShellWindow1() {
+            if (document.getElementById("shellWindow")) return;
+
+            let shellWindow = document.createElement("div");
+            shellWindow.id = "shellWindow";
+            shellWindow.className = "window";
+            shellWindow.style.width = "700px";
+            shellWindow.style.height = "500px";
+            shellWindow.style.position = "fixed";
+            shellWindow.style.left = "50%";
+            shellWindow.style.top = "50%";
+            shellWindow.style.transform = "translate(-50%, -50%)";
+            shellWindow.style.background = "rgba(0, 0, 0, 0.9)";
+            shellWindow.style.border = "2px solid #00ffcc";
+            shellWindow.style.zIndex = "1500";
+            shellWindow.style.display = "flex";
+            shellWindow.style.flexDirection = "column";
+
+            let shellFrame = document.createElement("iframe");
+            shellFrame.id = "shellFrame";
+            shellFrame.style.flexGrow = "1";
+            shellFrame.style.width = "100%";
+            shellFrame.style.border = "none";
+            shellFrame.src = "shell1.html";
+
+            let shellButtonBar = document.createElement("div");
+            shellButtonBar.style.width = "100%";
+            shellButtonBar.style.height = "40px";
+            shellButtonBar.style.display = "flex";
+            shellButtonBar.style.justifyContent = "flex-end";
+            shellButtonBar.style.padding = "5px";
+            shellButtonBar.style.borderTop = "1px solid #00ffcc";
+            shellButtonBar.style.background = "#002222";
+
+            let closeButton = document.createElement("button");
+            closeButton.innerText = "Close";
+            closeButton.style.padding = "5px 10px";
+            closeButton.style.background = "#003322";
+            closeButton.style.color = "#00ffcc";
+            closeButton.style.border = "1px solid #00ffcc";
+            closeButton.style.cursor = "pointer";
+            closeButton.addEventListener("click", () => {
+                shellWindow.remove();
+            });
+
+            shellButtonBar.appendChild(closeButton);
+            shellWindow.appendChild(shellFrame);
+            shellWindow.appendChild(shellButtonBar);
+            document.body.appendChild(shellWindow);
+        }
+    </script>
+</body>
+</html>

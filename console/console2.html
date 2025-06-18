@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Agency Terminal</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: black;
+      color: #00FF00;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 16px;
+      padding: 10px;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #terminal {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      height: calc(100vh - 20px);
+      overflow-y: auto;
+    }
+    .input-line {
+      display: flex;
+      align-items: center;
+    }
+    .blinker {
+      animation: blink 1s step-start infinite;
+    }
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+    #output {
+      min-height: 1em;
+    }
+  </style>
+</head>
+<body>
+  <div id="terminal">
+    <div>> Initializing secure terminal...</div>
+    <div>> SSH authentication: OK</div>
+    <div>> Type "help" for command list</div><br>
+    <div id="output"></div>
+    <div class="input-line">&gt; <span id="command"></span><span class="blinker">█</span></div>
+  </div>
+
+  <script>
+    const commandEl = document.getElementById("command");
+    const outputEl = document.getElementById("output");
+    const terminalEl = document.getElementById("terminal");
+    let currentCommand = "";
+
+    const commands = {
+      "help": [
+        "Available commands:",
+        " - scan_network",
+        " - bypass_firewall",
+        " - disable_firewall",
+        " - bypass_antivirus",
+        " - disable_antivirus",
+        " - build_payload",
+        " - deploy_payload",
+        " - deploy_beacon",
+        " - deploy_shell",        
+        " - access_files",
+        " - cred_harvest",
+        " - lat_move",
+        " - data_exfil",
+        " - enum_users",
+        " - dump_hashes",
+        " - brute_force",
+        " - port_scan",
+        " - exploit_db",
+        " - persistence",
+        " - cleanup",
+        " - clear",
+        " - help"
+      ],
+      "scan_network": [
+        "[*] Initiating network scan...",
+        "[*] Scanning 192.168.0.1 - 192.168.0.254",
+        "[+] Device found: SEC-GATEWAY [192.168.0.1]",
+        "[+] Device found: INTERNAL-SERVER [192.168.0.42]",
+        "[+] Vulnerability detected on 192.168.0.42: CVE-2025-XXXX"
+      ],
+      "bypass_firewall": [
+        "[*] Attempting firewall bypass...",
+        "[*] Injecting crafted packets...",
+        "[>] SYN flood detected on port 80, throttling...",
+        "[+] Firewall rule bypassed: Established/Related traffic allowed.",
+        "[*] Establishing reverse shell...",
+        "[*] Firewall analysis initiated...",
+        "[*] Probing open ports...",
+        "[+] Found open port: 22 (SSH)",
+        "[*] Attempting SSH tunneling...",
+        "[+] Tunnel established successfully."
+      ],
+      "disable_firewall": [
+        "[*] Attempting to disable local firewall...",
+        "[*] Executing command: netsh advfirewall set allprofiles state off",
+        "[+] Firewall service stopped.",
+        "[*] Searching for firewall management process...",
+        "[+] Found process: Windows Firewall (svchost.exe)",
+        "[*] Attempting to terminate process (PID: XXXX)...",
+        "[+] Process terminated successfully. Firewall disabled."
+      ],
+      "bypass_antivirus": [
+        "[*] Attempting AntiVirus bypass...",
+        "[*] Obfuscating payload...",
+        "[>] Suspicious behavior detected by Real-Time Protection.",
+        "[+] Payload execution successful after multiple encoding attempts.",
+        "[*] Analyzing AntiVirus signatures...",
+        "[*] Identifying vulnerable service...",
+        "[+] Found vulnerable service: AntiVirus Updater",
+        "[*] Exploiting service to disable real-time scanning...",
+        "[+] Real-time scanning disabled."
+      ],
+      "disable_antivirus": [
+        "[*] Attempting to disable AntiVirus software...",
+        "[*] Executing command: taskkill /F /IM antivirus.exe",
+        "[>] Access denied. Retrying with elevated privileges...",
+        "[+] AntiVirus process terminated successfully.",
+        "[*] Searching for AntiVirus control panel...",
+        "[*] Found process: AVControl.exe",
+        "[*] Attempting to close process (PID: 13422)...",
+        "[+] Process closed. AntiVirus likely disabled."
+      ],
+      "build_payload": [
+        "[*] Initializing payload generation...",
+        "[*] Selecting exploit: MS17-010 EternalBlue",
+        "[*] Configuring target IP: 192.168.1.100",
+        "[*] Setting reverse shell listener: 10.0.0.5:4444",
+        "[*] Generating final payload (stage 1)...",
+        "[*] Payload size: 4096 bytes",
+        "[*] Payload construction complete.",
+        "[*] Building custom payload...",
+        "[*] Injecting shellcode: windows/x64/meterpreter/reverse_tcp",
+        "[*] Setting LHOST: 10.0.0.10",
+        "[*] Setting LPORT: 1234",
+        "[*] Applying evasion techniques...",
+        "[*] Payload ready for deployment."
+      ],
+      "deploy_payload": [
+        "[*] Deploying payload to target: 192.168.1.100",
+        "[*] Using delivery method: SMB",
+        "[*] Transmitting payload (4096 bytes)...",
+        "[+] Payload sent successfully.",
+        "[*] Attempting remote execution...",
+        "[*] Executing payload via WMI...",
+        "[+] Payload execution initiated. Waiting for connection..."
+      ],
+      "deploy_beacon": [
+        "[*] Deploying beacon to target: 192.168.1.150",
+        "[*] Beacon type: HTTP",
+        "[*] Callback interval: 5 seconds",
+        "[*] Server address: beacon.example.com:8080",
+        "[*] Beacon deployed. Listening for callback...",
+        "[*] Generating staged beacon...",
+        "[*] Stage 1 size: 1024 bytes",
+        "[*] Sending stage 1 to target...",
+        "[*] Stage 2 received and executed. Beacon active."
+      ],
+      "deploy_shell": [
+        "[*] Deploying payload...",
+        "[*] Encoding shell...",
+        "[*] Sending to target...",
+        "[+] Exploit successful!",
+        "[+] Shell opened on 192.168.0.42:4444"
+      ],
+      "access_files": [
+        "[*] Establishing session with target...",
+        "[*] Navigating file system...",
+        "[*] Listing directory: C:\\users\\Public\\Documents",
+        "[+] Found file: confidential.docx",
+        "[*] Downloading file: confidential.docx...",
+        "[+] Download complete: confidential.docx (15KB)",
+        "[*] Browsing remote file system...",
+        "[*] Searching for keywords: 'password';'passwd';'cred' ",
+        "[+] Found potential match in: C:\\config.ini",
+        "[*] Reading file: C:\\config.ini...",
+        "[+] File content retrieved successfully."
+      ],
+      "cred_harvest": [
+        "[*] Attempting credential dump...",
+        "[*] Executing Mimikatz module: sekurlsa::logonpasswords",
+        "[+] Found credentials for user: Administrator",
+        "[+] Username: Administrator, Password: SecurePassword123!",
+        "[*] Intercepting network traffic on port 110 (POP3)...",
+        "[+] Captured potential username: user@example.com",
+        "[+] Captured potential password: pop3secret"
+      ],
+      "lat_move": [
+        "[*] Identifying potential pivot points...",
+        "[+] Found active session on: 192.168.0.50",
+        "[*] Attempting to migrate process...",
+        "[+] Process migration successful (PID: 42137).",
+        "[*] Scanning network for shared folders...",
+        "[+] Found accessible share: \\192.168.0.60\SharedDocs",
+        "[*] Attempting to access shared folder...",
+        "[+] Access granted."
+      ],
+      "data_exfil": [
+        "[*] Preparing data for exfiltration...",
+        "[*] Compressing files...",
+        "[*] Encrypting data with AES-256...",
+        "[*] Sending data to: exfil.server.net:9999",
+        "[+] Data exfiltration complete (1.2GB).",
+        "[*] Establishing covert channel via DNS...",
+        "[*] Encoding data for DNS tunneling...",
+        "[*] Sending data chunks...",
+        "[+] Data exfiltration successful."
+      ],
+      "enum_users": [
+        "[*] Enumerating domain users...",
+        "[+] Found 42 user accounts",
+        "[*] Extracting user details...",
+        "[+] Administrator (SID: S-1-5-21-...)",
+        "[+] Guest (SID: S-1-5-21-...)",
+        "[+] SQLService (SID: S-1-5-21-...)",
+        "[*] Checking for privileged accounts...",
+        "[+] Found 3 accounts with Domain Admin privileges"
+      ],
+      "dump_hashes": [
+        "[*] Attempting to extract password hashes...",
+        "[*] Dumping SAM database...",
+        "[+] SYSTEM hive acquired",
+        "[+] SAM hive acquired",
+        "[*] Decrypting hashes...",
+        "[+] Administrator:500:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::",
+        "[+] Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::",
+        "[*] Attempting to crack hashes...",
+        "[+] 1 weak password identified"
+      ],
+      "brute_force": [
+        "[*] Initializing brute force attack...",
+        "[*] Target: ssh://192.168.0.42:22",
+        "[*] Loading wordlist: rockyou.txt",
+        "[*] Testing credentials...",
+        "[>] Attempt 142: admin/password123 - FAIL",
+        "[>] Attempt 143: admin/Password1 - FAIL",
+        "[>] Attempt 144: admin/Summer2025! - SUCCESS",
+        "[+] Valid credentials found: admin/Summer2025!",
+        "[*] Attempting login...",
+        "[+] Authentication successful"
+      ],
+      "port_scan": [
+        "[*] Starting port scan...",
+        "[*] Target: 192.168.0.42",
+        "[*] Scanning top 1000 ports...",
+        "[+] Port 22/tcp open - SSH",
+        "[+] Port 80/tcp open - HTTP",
+        "[+] Port 443/tcp open - HTTPS",
+        "[+] Port 3389/tcp open - RDP",
+        "[*] Service detection running...",
+        "[+] SSH: OpenSSH 8.2 (protocol 2.0)",
+        "[+] HTTP: Apache 2.4.46 (Win32)"
+      ],
+      "exploit_db": [
+        "[*] Searching exploit database...",
+        "[*] Target: Windows Server 2019",
+        "[*] Checking for known vulnerabilities...",
+        "[+] CVE-2025-1234: Remote Code Execution (9.8/10)",
+        "[+] CVE-2025-5678: Privilege Escalation (8.2/10)",
+        "[*] Downloading exploit code...",
+        "[+] Exploit downloaded: cve2025-1234.py",
+        "[*] Compiling exploit...",
+        "[+] Exploit ready for deployment"
+      ],
+      "persistence": [
+        "[*] Establishing persistence...",
+        "[*] Creating scheduled task...",
+        "[+] Task created: 'Windows Update Helper'",
+        "[*] Setting trigger: system startup",
+        "[*] Adding payload to startup folder...",
+        "[+] Payload copied to: C:\\Users\\Public\\startup\\",
+        "[*] Creating new service...",
+        "[+] Service installed: 'Print Spooler Helper'",
+        "[*] Modifying registry...",
+        "[+] Persistence mechanisms installed"
+      ],
+      "cleanup": [
+        "[*] Beginning cleanup operations...",
+        "[*] Removing log files...",
+        "[+] 42 event logs cleared",
+        "[*] Deleting temporary files...",
+        "[+] 1.2GB of artifacts removed",
+        "[*] Modifying timestamps...",
+        "[+] File access times randomized",
+        "[*] Disabling auditing...",
+        "[+] Security logging disabled",
+        "[*] Operation completed. Minimal traces remain."
+      ],
+      "clear": ["clear_screen"]
+    };
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        // Add the command to output
+        appendOutput(`\n> ${currentCommand}`);
+        
+        // Process the command
+        handleCommand(currentCommand.trim().toLowerCase());
+        
+        // Reset command input
+        currentCommand = "";
+        commandEl.textContent = "";
+      } else if (e.key === "Backspace") {
+        currentCommand = currentCommand.slice(0, -1);
+        commandEl.textContent = currentCommand;
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+        currentCommand += e.key;
+        commandEl.textContent = currentCommand;
+      }
+    });
+
+    function appendOutput(text) {
+      outputEl.innerHTML += text;
+      terminalEl.scrollTop = terminalEl.scrollHeight;
+    }
+
+    function handleCommand(cmd) {
+      const lines = commands[cmd];
+      if (!lines) {
+        appendOutput(`\n[!] Unknown command: ${cmd}`);
+        return;
+      }
+      if (lines[0] === "clear_screen") {
+        outputEl.innerHTML = "";
+        return;
+      }
+      simulateOutput(lines);
+    }
+
+    function simulateOutput(lines) {
+      let i = 0;
+      function nextLine() {
+        if (i < lines.length) {
+          appendOutput("\n" + lines[i]);
+          i++;
+          setTimeout(nextLine, 500);
+        }
+      }
+      nextLine();
+    }
+
+    // Focus the terminal on load
+    window.onload = function() {
+      document.body.focus();
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APISniper v2.3.1</title>
+  <style>
+    body {
+      background-color: #0a0a0a;
+      color: #00ff00;
+      font-family: monospace;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #0ff;
+      margin-bottom: 10px;
+    }
+
+    #console {
+      background-color: #111;
+      border: 1px solid #333;
+      padding: 15px;
+      height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .btn {
+      background-color: #222;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      padding: 10px;
+      margin-top: 10px;
+      cursor: pointer;
+      font-family: monospace;
+    }
+
+    .btn:hover {
+      background-color: #004400;
+    }
+
+    .critical { color: #ff4444; font-weight: bold; }
+    .high { color: orange; font-weight: bold; }
+    .medium { color: yellow; font-weight: bold; }
+    .low { color: #00ff00; }
+
+    #progressBar {
+      width: 100%;
+      background: #222;
+      border: 1px solid #00ff00;
+      height: 20px;
+      margin-top: 10px;
+    }
+    #progressFill {
+      height: 100%;
+      width: 0%;
+      background: #00ff00;
+    }
+
+    #detailsPopup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #111;
+      color: #0f0;
+      border: 2px solid #0f0;
+      padding: 20px;
+      display: none;
+      z-index: 10;
+    }
+    #detailsPopup h3 {
+      color: #0ff;
+      margin-bottom: 10px;
+    }
+
+    #scanOptions {
+      margin-top: 20px;
+      background: #111;
+      padding: 10px;
+      border: 1px solid #333;
+    }
+    #commandInput {
+      margin-top: 10px;
+      width: 100%;
+      background: #000;
+      color: #0f0;
+      border: 1px solid #0f0;
+      padding: 5px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>APISniper v2.3.1</h1>
+
+  <div id="scanOptions">
+    <strong>Scan Options:</strong><br>
+    <label><input type="checkbox" id="deprec"> Include Deprecated Endpoints</label><br>
+    <label><input type="checkbox" id="brute"> Brute Force Token Authentication</label><br>
+    <label><input type="checkbox" id="deep"> Enable Deep Vulnerability Check</label><br>
+
+    <strong>Advanced Options:</strong><br>
+    <label><input type="checkbox" id="pack"> Deep Packet Inspection</label><br>
+    <label><input type="checkbox" id="prot"> Protocol Analysis</label><br>
+    <label><input type="checkbox" id="device"> Device Fingerprinting</label><br>
+
+    <strong>Other Options:</strong><br>
+    <label><input type="checkbox" id="save"> Save Data to Central Storage</label><br>
+    <label><input type="checkbox" id="optExport"> Export Results as JSON</label><br>
+    <label><input type="checkbox" id="fuzz"> Fuzzy Logic Search Functions</label><br>
+  </div>
+
+  <div id="console"></div>
+
+  <div id="progressBar"><div id="progressFill"></div></div>
+
+  <button class="btn" onclick="runScan()">Run API Vulnerability Scan</button>
+
+  <input type="text" id="commandInput" placeholder="Enter command (e.g., scan 192.168.0.1)" onkeydown="handleCommand(event)">
+
+  <div id="detailsPopup"></div>
+
+  <script>
+    // ========== CONFIGURATION ==========
+    const CONFIG = {
+      SCAN_DELAY: 500,
+      PROGRESS_UPDATE_INTERVAL: 120,
+      DEFAULT_TARGET: "192.168.44.12",
+      ENDPOINT_COUNT: 8
+    };
+
+    // ========== DATA ==========
+    const VULNERABILITY_DATA = [
+      {
+        endpoint: "/api/device/config",
+        method: "GET",
+        auth: "NONE",
+        issue: "Unauthenticated Configuration Access",
+        risk: "CRITICAL",
+        cvss: "9.8",
+        details: "Access to sensitive device configuration without authentication.",
+        recommendation: "Require OAuth2 or Token-based auth."
+      },
+      {
+        endpoint: "/api/system/debug",
+        method: "POST",
+        auth: "TOKEN",
+        issue: "Debug Mode Enabled in Production",
+        risk: "HIGH",
+        cvss: "8.6",
+        details: "Debug responses reveal internal system details including kernel version.",
+        recommendation: "Disable debug mode in production environment."
+      },
+      {
+        endpoint: "/api/auth/refresh",
+        method: "POST",
+        auth: "JWT",
+        issue: "Token Reuse Vulnerability",
+        risk: "MEDIUM",
+        cvss: "6.4",
+        details: "Reused tokens allow session replay for up to 20 minutes after logout.",
+        recommendation: "Implement rotating tokens and invalidate on logout."
+      }
+    ];
+
+    const TECH_NAMES = ["telemetry", "cryptolib", "sensorsync", "geofence", "mobauth", "alertstream", "netmon", "auditlog"];
+    const RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+    const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE'];
+    const AUTH_TYPES = ['NONE', 'TOKEN', 'JWT', 'OAUTH'];
+
+    // ========== CORE FUNCTIONS ==========
+    function runScan() {
+      resetUI();
+      showScanIntroduction()
+        .then(showEnhancementMessages)
+        .then(scanNetwork)
+        .then(scanForVulnerabilities)
+        .then(displayFinalReport)
+        .catch(handleError);
+    }
+
+    function resetUI() {
+      const consoleEl = document.getElementById('console');
+      const fill = document.getElementById('progressFill');
+      consoleEl.innerHTML = '';
+      fill.style.width = '0%';
+    }
+
+    function showScanIntroduction() {
+      return new Promise((resolve) => {
+        const introLines = [
+          "[INFO] Establishing secure connection...",
+          "[INFO] Handshaking with target node...",
+          "[INFO] Authentication bypass initiated...",
+          "[INFO] Injection module deployed...",
+          "[INFO] Initializing scan engine..."
+        ];
+
+        introLines.forEach((line, i) => {
+          setTimeout(() => logLine(line), i * CONFIG.SCAN_DELAY);
+        });
+
+        setTimeout(resolve, introLines.length * CONFIG.SCAN_DELAY);
+      });
+    }
+
+    function showEnhancementMessages() {
+      return new Promise((resolve) => {
+        const enhancements = getScanEnhancements();
+        
+        if (enhancements.length > 0) {
+          logLine("\n[INFO] Loading advanced modules:");
+          enhancements.forEach((line, i) => {
+            setTimeout(() => logLine(line), i * CONFIG.SCAN_DELAY);
+          });
+          
+          setTimeout(resolve, enhancements.length * CONFIG.SCAN_DELAY);
+        } else {
+          resolve();
+        }
+      });
+    }
+
+    function getScanEnhancements() {
+      const enhancements = [];
+
+      if (document.getElementById('pack').checked) {
+        enhancements.push("[PACKETS] Parsing packet payloads...");
+      }
+      if (document.getElementById('prot').checked) {
+        enhancements.push("[PROTOCOLS] Protocol analysis in progress...");
+      }
+      if (document.getElementById('fuzz').checked) {
+        enhancements.push("[LOGIC] Fuzzy logic search functionality running...");
+      }
+      if (document.getElementById('device').checked) {
+        enhancements.push("[DEVICE] Device Fingerprinting: Low Risk Only!");
+      }
+      if (document.getElementById('deprec').checked) {
+        enhancements.push("[ENDPOINTS] Analysing endpoint functionality...");
+      }
+      if (document.getElementById('brute').checked) {
+        enhancements.push("[BRUTE] Brute force mode: Stand By...");
+      }
+      if (document.getElementById('deep').checked) {
+        enhancements.push("[DEEP] Theoretical Vulnerability Matrix: Online...");
+      }
+
+      return enhancements;
+    }
+
+    function scanNetwork() {
+      return new Promise((resolve) => {
+        const steps = [
+          "[SCAN] Scanning subnet 192.168.0.0/16...",
+          "[SCAN] Detected device at 192.168.1.1 [ROUTER]",
+          "[SCAN] Detected device at 192.168.10.1 [SWITCH]",
+          "[SCAN] Detected device at 192.168.10.10 [WORKSTATION]",
+          "[SCAN] Detected device at 192.168.10.11 [SERVER]",
+          "[SCAN] Detected device at 192.168.20.1 [SWITCH]",
+          "[SCAN] Detected device at 192.168.20.10 [WORKSTATION]",
+          "[SCAN] Detected device at 192.168.20.11 [SERVER]",
+          "[SCAN] Detected device at 192.168.30.10 [SWITCH]",	
+          "[SCAN] Detected device at 192.168.30.10 [WORKSTATION]",
+          "[SCAN] Detected device at 192.168.30.11 [SERVER]",
+          "[SCAN] Detected device at 192.168.40.1 [SWITCH]",
+          "[SCAN] Detected device at 192.168.40.10 [WORKSTATION]",
+          "[SCAN] Detected device at 192.168.40.20 [SERVER]",
+          "[SCAN] Detected device at 192.168.50.1 [SWITCH]",
+          "[SCAN] Detected device at 192.168.50.10 [PRINTERS]",
+          "[SCAN] Detected device at 192.168.60.20 [VOIP EXCHANGE]",
+          "[SCAN] Detected device at 192.168.60.10 [PBX LEGACY ARRAY]",
+          "[SCAN] Detected device at 192.168.70.10 [WIRELESS AP]",
+          "[SCAN] Running vulnerability scan..."
+        ];
+
+        let stepIndex = 0;
+        const stepInterval = setInterval(() => {
+          if (stepIndex < steps.length) {
+            logLine(steps[stepIndex]);
+            updateProgress((stepIndex + 1) / steps.length * 50);
+            stepIndex++;
+          } else {
+            clearInterval(stepInterval);
+            resolve();
+          }
+        }, CONFIG.SCAN_DELAY);
+      });
+    }
+
+    function scanForVulnerabilities() {
+      return new Promise((resolve) => {
+        const exportEnabled = document.getElementById('optExport').checked;
+        const scanData = generateScanData(CONFIG.ENDPOINT_COUNT);
+
+        if (exportEnabled) {
+          logLine("[INFO] Export enabled. Results will be saved as JSON.");
+        }
+
+        logLine(`=== API VULNERABILITY SCAN REPORT ===`);
+        logLine(`Tool: APISniper v2.3.1`);
+        logLine(`Target: ${CONFIG.DEFAULT_TARGET}`);
+        logLine(`Scan Started: ${new Date().toLocaleString()}`);
+        logLine(`--------------------------------------------------`);
+
+        let progress = 50;
+        const progressInterval = setInterval(() => {
+          progress += 50 / scanData.length;
+          updateProgress(progress);
+          if (progress >= 100) clearInterval(progressInterval);
+        }, CONFIG.PROGRESS_UPDATE_INTERVAL);
+
+        scanData.forEach((item, i) => {
+          setTimeout(() => displayVulnerability(item, i), CONFIG.SCAN_DELAY * (i + 1));
+        });
+
+        setTimeout(() => {
+          logLine("--------------------------------------------------");
+          logLine(`Vulnerabilities Found: ${scanData.length}`);
+          logLine(`Report Saved: ./reports/scan_${CONFIG.DEFAULT_TARGET}.json`);
+          resolve();
+        }, CONFIG.SCAN_DELAY * (scanData.length + 1));
+      });
+    }
+
+    function displayFinalReport() {
+      logLine("[INFO] Scan complete. Ready for next operation.");
+    }
+
+    function generateScanData(count) {
+      let scanData = [...VULNERABILITY_DATA];
+      const additional = Math.max(0, count - scanData.length);
+
+      for (let i = 0; i < additional; i++) {
+        const tech = TECH_NAMES[Math.floor(Math.random() * TECH_NAMES.length)];
+        const risk = RISK_LEVELS[Math.floor(Math.random() * RISK_LEVELS.length)];
+        scanData.push({
+          endpoint: `/api/${tech}/v${1 + (i % 3)}/module`,
+          method: HTTP_METHODS[i % HTTP_METHODS.length],
+          auth: AUTH_TYPES[i % AUTH_TYPES.length],
+          issue: `Autogenerated vulnerability in ${tech}`,
+          risk,
+          cvss: (Math.random() * 10).toFixed(1),
+          details: `Simulated issue in ${tech} module for endpoint ${i}.`,
+          recommendation: `Check ${tech} security config.`
+        });
+      }
+
+      return scanData.slice(0, count);
+    }
+
+    function displayVulnerability(item, index) {
+      const colorClass = item.risk.toLowerCase();
+      const display = `\n[+] Endpoint: ${item.endpoint}\n    Method: ${item.method}\n    Auth: ${item.auth}\n    Issue: ${item.issue}\n    Risk: <span class='${colorClass}' onclick='showDetails(${index})'>${item.risk}</span>`;
+      logLine(display);
+    }
+
+    function showDetails(index) {
+      const allData = generateScanData(CONFIG.ENDPOINT_COUNT);
+      const item = allData[index];
+      
+      const popup = document.getElementById('detailsPopup');
+      popup.innerHTML = `
+        <h3>Vulnerability Details</h3>
+        <strong>Endpoint:</strong> ${item.endpoint}<br>
+        <strong>Issue:</strong> ${item.issue}<br>
+        <strong>CVSS:</strong> ${item.cvss}<br>
+        <strong>Details:</strong> ${item.details}<br>
+        <strong>Recommendation:</strong> ${item.recommendation}<br><br>
+        <button class='btn' onclick='closePopup()'>Close</button>
+      `;
+      popup.style.display = 'block';
+    }
+
+    function closePopup() {
+      document.getElementById('detailsPopup').style.display = 'none';
+    }
+
+    function updateProgress(percent) {
+      document.getElementById('progressFill').style.width = `${percent}%`;
+    }
+
+    function logLine(text) {
+      const consoleEl = document.getElementById('console');
+      consoleEl.innerHTML += text + "\n";
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function handleCommand(e) {
+      if (e.key === 'Enter') {
+        const val = e.target.value.trim();
+        if (val.startsWith('scan')) {
+          logLine(`\n[COMMAND] ${val}`);
+          runScan();
+        } else {
+          logLine(`[ERROR] Unknown command: ${val}`);
+        }
+        e.target.value = '';
+      }
+    }
+
+    function handleError(error) {
+      logLine(`[ERROR] Scan failed: ${error.message}`);
+      console.error(error);
+    }
+  </script>
+</body>
+</html>

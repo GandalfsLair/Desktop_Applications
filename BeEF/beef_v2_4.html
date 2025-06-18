@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BeEF Interface</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #121212;
+            color: #0f0;
+            margin: 0;
+            padding: 0;
+        }
+        #header {
+            background-color: #000;
+            padding: 10px;
+            border-bottom: 1px solid #333;
+        }
+        #main {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+        #sidebar {
+            width: 250px;
+            background-color: #111;
+            border-right: 1px solid #333;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        #content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+        .module {
+            padding: 5px;
+            margin: 5px 0;
+            cursor: pointer;
+            border-left: 3px solid #0a0;
+        }
+        .module:hover {
+            background-color: #222;
+        }
+        #console {
+            background-color: #000;
+            height: 200px;
+            overflow-y: scroll;
+            padding: 10px;
+            border: 1px solid #333;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .browser {
+            padding: 5px;
+            margin: 3px 0;
+            background-color: #1a1a1a;
+            cursor: pointer;
+        }
+        .browser.selected {
+            background-color: #003300;
+            border-left: 3px solid #0f0;
+        }
+        .action-btn {
+            background-color: #300;
+            color: #f00;
+            border: 1px solid #f00;
+            padding: 5px 10px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            display: block;
+            width: 100%;
+        }
+        .action-btn:hover {
+            background-color: #500;
+        }
+        #search-browsers-btn {
+            background-color: #113;
+            color: #0af;
+            border: 1px solid #0af;
+        }
+        #search-browsers-btn:hover {
+            background-color: #225;
+        }
+        /* Watering hole popup styles */
+        #watering-hole-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #300;
+            color: #f00;
+            border: 2px solid #f00;
+            padding: 20px;
+            z-index: 1000;
+            text-align: center;
+            display: none;
+            box-shadow: 0 0 20px #f00;
+        }
+        #watering-hole-popup h2 {
+            margin-top: 0;
+        }
+        .attack-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.attack-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+    </style>
+</head>
+<body>
+    <!-- Watering hole popup -->
+    <div id="watering-hole-popup">
+        <h2>Watering Hole Visited!</h2>
+        <p>Target browser has been hooked</p>
+    </div>
+
+    <div id="header">
+        <h1>BeEF - Browser Exploitation Framework <span style="color:#aaa;font-size:14px;">v1.3.7</span></h1>
+    </div>
+    <div id="main">
+        <div id="sidebar">
+            <h3>Hooked Browsers</h3>
+            <div id="hooked-browsers">
+                <!-- Browsers will be added here -->
+            </div>
+            
+            <button id="search-browsers-btn" class="action-btn" onclick="searchForBrowsers()">Search for Browsers</button>
+            <button class="action-btn" onclick="clearHookedBrowsers()">Clear Hooked Browsers</button>
+            <button class="action-btn" onclick="clearLog()">Clear Log</button>
+            
+            <h3>Modules</h3>
+            <div class="module" onclick="loadModule('social_engineering')">Social Engineering</div>
+            <div class="module" onclick="loadModule('exploits')">Exploits</div>
+            <div class="module" onclick="loadModule('network')">Network</div>
+            <div class="module" onclick="loadModule('device')">Device</div>
+            <div class="module" onclick="loadModule('session')">Sessions</div>
+            <div class="module" onclick="loadModule('browser')">Browser</div>
+            <div class="module" onclick="loadModule('server')">Server</div>
+            <div class="module" onclick="loadModule('plugins')">Plug Ins</div>
+        </div>
+        <div id="content">
+            <h2 id="module-title">Select a Module</h2>
+            <div id="module-content"></div>
+            <div id="console">
+                <div class="log-entry">[+] System initialized</div>
+                <div class="log-entry">[!] No browsers currently hooked</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Database of available browsers
+        const browserDatabase = [
+            { ip: "192.168.1.100", browser: "Chrome 91", os: "Windows 10" },
+            { ip: "192.168.1.101", browser: "Firefox 89", os: "macOS 11" },
+            { ip: "192.168.1.102", browser: "Edge 93", os: "Windows 11" },
+            { ip: "192.168.1.103", browser: "Safari 14", os: "macOS 12" }
+        ];
+      
+        let hookedBrowsers = [];
+        let selectedBrowser = null;
+    //SOCIAL ENGINEERING VARIABLES    
+        let userName = "Admin";
+        let passWord = "Password123";
+        let targetApp = "Microsoft Office 365";
+    
+    //EXPLOIT VARIABLES
+        let vulnproc = "13742 - updatemger_keepalive";
+        let remIP = "137.42.10.220";
+        let remPort = "8080";
+        let fileLoc = "C:/user/Admin/mydocuments";
+        let fileDown = "passwords.txt";
+        let fileUp = "payload.bin";
+    //NETWORK VARIABLES
+        let routIP = "192.168.10.1";
+        let routMAC = "1A-2B-3C-4D-5E-6F";
+        let routPorts = "22 : SSH ; 25 : SMTP (Simple Mail Transfer Protocol) ; 80 : HTTP (Hypertext Transfer Protocol) ; 3389 : RDP (Remote Desktop Protocol)";
+        let routLog = "U_Name:Admin;P_Word:Password123";
+        let ipWhite = "137.42.10.10";
+        let ipBlack = "204.126.42.12"
+        let expCred = "U_Name:Hacker;P_Word:Hacker123";
+        let netHome = "CIS_042_137";
+        let netConn = "VPN_Conn(EE0F-AE42)";
+        let netMeth = "VPN Tunnelling";
+        let netNew = "/SECURE_NET/E0-13742";
+        let netPt = "Network Connections/LocalHost";
+        let availNets = "*Wifi_Access_Cache*\n[+] all_user_profile/CoffeeRepublic [E0FF-A34D-F137]\n[+] all_user_profile/WorkNetwork [AB12-CC42-AE03]\n[+] all_user_profile/SecureWeb [0D1F-F2D1-DE42]";
+
+    //DEVICE VARIABLES
+        let devOS = "Windows 10; Serv Pk 2.4.1; Enterprise";
+        let hardWare = "Host name: DESKTOP_A142-135\n [+] Physical Address: 00-1A-2B-3C-4D-5E\n [+] IP Address: 192.168.10.12\n [+] Subnet Mask: 255.255.255.0\n [+] Default Gateway: 192.168.10.1\n [+] DNS Servers: 192.168.10.1\n [+] Interface: 192.168.10.110 --- 0x12\n [+] Internet Address 192.168.10.1 | Physical Address 00-FF-AA-BB-CC-DD | Type dynamic\n [+] Internet Address 192.168.10.100 | Physical Address 00-EE-11-22-33-44 | Type dynamic  ";
+        let plugIns = "** LIST OF PLUGINS **";
+        let vulnPlug = "** SPECIFIC VULNERABLE PLUGIN **";
+        let vulnRes = "** LIST OF VULNERABILITIES **";
+
+    //SESSION VARIABLES
+        let sessID = "** Session ID **";
+        let sessExp = "** Exploit for Injection **"; //Session Injection?
+        let reqCsrf = "** Token for Cross Site Request Forgery **"; 
+        let malSess = "** Malicious Session ID **";
+    //BROWSER VARIABLES
+        let pivotMeth = "SSH Tunnelling";
+        let pivotPt = "/update_manager/Keep_a_live";
+        let mitmIP = "42.137.10.12";
+        let mitmPort = "80";
+        let dosIP = "";
+        let dosPort = "";
+        let browFing = "** Browser Fingerprint **";
+    //SERVER VARIABLES
+        let servulnRes = "** Server Vulnerabilities **";
+        let servWare = "** Server Hardware **";
+        let certSteal = "** Cert **";
+        let reqSsrf = "** Server side request **";
+        let netMap = "** Network Map Data **";
+    //OTHER VARIABLES
+        let payLoad = "tcp/reverse_shell";
+        let plugEphem ="#FE137";
+        let plugBabel ="#E0A42";
+
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', function() {
+            updateHookedBrowsersDisplay();
+            
+            // Add keydown event listener for Enter key
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    triggerWateringHole();
+                }
+            });
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key.toLowerCase() === 'c') {
+                    triggerWateringHole2();
+                }
+            });
+        });
+
+        // Watering hole attack function
+        function triggerWateringHole() {
+            // Show the popup
+            const popup = document.getElementById('watering-hole-popup');
+            popup.style.display = 'block';
+            
+            // Search for browsers
+            searchForBrowsers();
+            
+            // Hide the popup after 3 seconds
+            setTimeout(function() {
+                popup.style.display = 'none';
+            }, 3000);
+        }
+
+                // Watering hole attack function
+        function triggerWateringHole2() {
+            // Show the popup
+            const popup = document.getElementById('watering-hole-popup');
+            popup.style.display = 'block';
+            
+            // Search for browsers
+            connectSingleBrowser();
+            
+            // Hide the popup after 3 seconds
+            setTimeout(function() {
+                popup.style.display = 'none';
+            }, 3000);
+        }
+
+
+        // Function to search for browsers
+        function searchForBrowsers() {
+            if (browserDatabase.length === 0) {
+                addLog('[+] No additional browsers detected');
+                return;
+            }
+            
+            // Find browsers not already hooked
+            const availableBrowsers = browserDatabase.filter(browser => 
+                !hookedBrowsers.some(hooked => hooked.ip === browser.ip)
+            );
+            
+            if (availableBrowsers.length === 0) {
+                addLog('[+] No new browsers detected');
+                return;
+            }
+            
+            // Add all available browsers
+            availableBrowsers.forEach(browser => {
+                if (!hookedBrowsers.some(hooked => hooked.ip === browser.ip)) {
+                    hookedBrowsers.push(browser);
+                }
+            });
+            
+            updateHookedBrowsersDisplay();
+            addLog(`[+] Found ${availableBrowsers.length} new browser(s)`);
+        }
+
+        // Rest of your existing functions remain unchanged...
+        // (All your existing functions from executeSocial() to executeServuln() remain exactly the same)
+        
+function connectSingleBrowser() {
+    const newBrowser = {
+        ip: "10.0.0.77",
+        browser: "Opera GX 96",
+        os: "Windows 11 Pro"
+    };
+
+    const alreadyHooked = hookedBrowsers.some(b => b.ip === newBrowser.ip);
+
+    if (!alreadyHooked) {
+        hookedBrowsers.push(newBrowser);
+        addLog(`[+] Manually hooked browser: ${newBrowser.ip} - ${newBrowser.browser}`);
+    } else {
+        addLog(`[!] Browser ${newBrowser.ip} already hooked`);
+    }
+
+    selectedBrowser = newBrowser;
+    updateHookedBrowsersDisplay();
+    addLog(`[+] Selected browser: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+}
+
+
+        // Function to clear hooked browsers
+        function clearHookedBrowsers() {
+            if (hookedBrowsers.length === 0) {
+                addLog('[!] No browsers to clear');
+                return;
+            }
+            
+            const count = hookedBrowsers.length;
+            hookedBrowsers = [];
+            selectedBrowser = null;
+            updateHookedBrowsersDisplay();
+            addLog(`[+] Cleared ${count} hooked browser(s)`);
+        }
+
+        // Function to update the hooked browsers display
+        function updateHookedBrowsersDisplay() {
+            const container = document.getElementById('hooked-browsers');
+            container.innerHTML = '';
+            
+            if (hookedBrowsers.length === 0) {
+                container.innerHTML = '<div class="browser">No browsers hooked</div>';
+                return;
+            }
+            
+            hookedBrowsers.forEach(browser => {
+                const browserElement = document.createElement('div');
+                browserElement.className = 'browser';
+                if (selectedBrowser && selectedBrowser.ip === browser.ip) {
+                    browserElement.classList.add('selected');
+                }
+                browserElement.textContent = `${browser.ip} - ${browser.browser}`;
+                browserElement.onclick = () => selectBrowser(browser);
+                container.appendChild(browserElement);
+            });
+        }
+
+        // Function to select a browser
+        function selectBrowser(browser) {
+            selectedBrowser = browser;
+            updateHookedBrowsersDisplay();
+            addLog(`[+] Selected browser: ${browser.ip} - ${browser.browser}`);
+        }
+
+        // Function to clear the log
+        function clearLog() {
+            const console = document.getElementById('console');
+            console.innerHTML = '';
+            addLog('[+] Log cleared');
+        }
+
+        // Function to add a log entry (with addition to recognise \n)
+        function addLog(message) {
+            const consoleElement = document.getElementById('console');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = message.replace(/\n/g, '<br>'); // Replace \n with <br>
+            consoleElement.appendChild(entry);
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+
+        // Previous module-related functions remain the same
+        function loadModule(module) {
+            const title = document.getElementById('module-title');
+            const content = document.getElementById('module-content');
+            
+            switch(module) {
+                case 'social_engineering':
+    title.textContent = 'Social Engineering';
+    content.innerHTML = `
+        <h3>Available Attacks</h3>
+        <div class="attack-grid">
+            <div class="attack-item">
+                <div>Fake Login Page</div>
+                <button onclick="executeSocial()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Fake Update Notification</div>
+                <button onclick="executeUpdate()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Browser Pop Ups</div>
+                <button onclick="executePop()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Click-Jacking</div>
+                <button onclick="executeClick()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Tab-Hooking</div>
+                <button onclick="executeTab()">Execute</button>
+            </div>
+        </div>
+    `;
+    break;
+    case 'exploits':
+	title.textContent = 'Exploits';
+	content.innerHTML = `
+		<h3>Available Exploits</h3>
+		<div class="attack-grid">
+			<div class="attack-item">
+				<div>Keylogger</div>
+				<button onclick="executeLogger()">Execute</button>
+            </div>
+			<div class="attack-item">
+				<div>MAC Address Enumeration</div>                        
+				<button onclick="executeMacenum()">Execute</button>
+            </div>                        
+			<div class="attack-item">
+				<div>MAC Address Spoofing</div> 
+				<button onclick="executeMacspoof()">Execute</button>
+            </div>
+			<div class="attack-item">
+				<div>File Download</div> 
+				<button onclick="executeDown()">Execute</button>
+            </div>                     
+			<div class="attack-item">
+				<div>File Upload</div> 
+				<button onclick="executeUplo()">Execute</button>
+			</div>
+		</div>
+`;
+break;
+case 'network':
+	title.textContent = 'Network';
+	content.innerHTML = `
+		<h3>Available Attacks/Exploits</h3>
+		<div class="attack-grid">
+            		<div class="attack-item">
+                		<div>Detect Routers/Gateways</div>
+				<button onclick="executeRoutdet()">Execute</button>
+                </div>
+            		<div class="attack-item">
+                		<div>Router Exploitation</div>
+				        <button onclick="executeRoutexp()">Execute</button>
+            	    </div>	
+                    <div class="attack-item">
+                		<div>Available Networks</div>
+				        <button onclick="executeAvnets()">Execute</button>                            
+            		</div>
+                    <div class="attack-item">
+                		<div>Port Scan (Internal)</div>
+				        <button onclick="executePortint()">Execute</button>
+            		</div>
+                    <div class="attack-item">
+                		<div>Port Scan (External)</div>
+				        <button onclick="executePortext()">Execute</button>
+            		</div>
+                    <div class="attack-item">
+                		<div>Enumerate DNS</div>
+				        <button onclick="executeDnsenum()">Execute</button>
+            		</div>
+                    <div class="attack-item">
+                		<div>DNS Binding</div>
+				        <button onclick="executeDnsbind()">Execute</button>
+            		</div>
+                    <div class="attack-item">
+                		<div>Network Pivot</div>
+				        <button onclick="executeNetpiv()">Execute</button>
+			        </div>
+		</div>
+`;
+break;
+case 'device':
+	title.textContent = 'Device';
+	content.innerHTML = `
+		<h3>Available Attacks</h3>
+		    <div class="attack-grid">
+                <div class="attack-item">
+				    <div>Operating System Detection</div>
+				    <button onclick="executeOsdet()">Execute</button>
+			    </div>
+                <div class="attack-item">				
+                    <div>Hardware Fingerprinting</div>
+                    <button onclick="executeHardfin()">Execute</button>
+                </div>
+                <div class="attack-item">
+                    <div>Enumerate Plugins (Client)</div>
+                    <button onclick="executePlugenum()">Execute</button>
+                </div>
+                <div class="attack-item">
+                    <div>Exploit Plugins (Client)</div>                        
+                    <button onclick="executePlugexp()">Execute</button>
+                </div>
+                <div class="attack-item">
+                    <div>Vulnerablility Scan</div>
+                    <button onclick="executeVulndev()">Execute</button>
+                </div>
+                <div class="attack-item">
+                    <div>Local Privilege Escalation</div>
+                    <button onclick="executePrivesc()">Execute</button>
+                </div>
+		</div>
+	`;
+break;
+case 'session':
+	title.textContent = 'Sessions';
+	content.innerHTML = `
+		<h3>Available Exploits</h3>
+        	<div class="attack-grid">
+            		<div class="attack-item">
+				<div class="exploit">Session Hijack</div>
+				<button onclick="executeSesshij()">Execute</button>
+			</div>
+            		<div class="attack-item">
+				<div>Session Injection</div>
+				<button onclick="executeSessinj()">Execute</button>                        
+			</div>
+            		<div class="attack-item">
+				<div>Cross Site Scripting (XSS)</div>
+				<button onclick="executeXss()">Execute</button>                        
+			</div>
+            		<div class="attack-item">
+				<div>Cross Site Request Forgery (CSRF)</div>
+				<button onclick="executeCsrf()">Execute</button>                        
+			</div>
+            		<div class="attack-item">
+				<div>Extract Cookie(s)</div>
+				<button onclick="executeCook()">Execute</button>                        
+			</div>
+            		<div class="attack-item">
+				<div>Session Storage Scrape</div>
+				<button onclick="executeScrape()">Execute</button>                        
+			</div>
+            		<div class="attack-item">
+				<div>Session Fixation</div>                         
+				<button onclick="executeSessfix()">Execute</button>
+			/<div>
+		/<div>
+`;
+break;
+case 'browser':
+	title.textContent = 'Browser';
+	content.innerHTML = `
+		<h3>Available Attacks/Exploits</h3>
+	        <div class="attack-grid">
+            		<div class="attack-item">
+				<div>Browser Fingerprinting</div>
+				<button onclick="executeBrowfing()">Execute</button>
+			</div>
+            <div class="attack-item">
+                <div>Denial of Service (Client)</div>
+                <button onclick="executeDoscli()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Browser History Extraction</div>
+                <button onclick="executeHist()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Man in the Middle</div>
+                <button onclick="executeMitm()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Browser Pivot</div>
+                <button onclick="executeBrowpiv()">Execute</button>
+            </div>
+        </div>
+`;
+break;
+
+case 'server':
+    title.textContent = 'Server';
+    content.innerHTML = `
+        <h3>Available Attacks/Exploits</h3>
+        <div class="attack-grid">
+            <div class="attack-item">         
+                <div>Network Mapping</div>
+                <button onclick="executeNetmap()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Denial of Service (Server)</div>
+                <button onclick="executeDosserv()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>Server Side Request Forgery (SSRF)</div>
+                <button onclick="executeSsrf()">Execute</button>
+            </div>
+            <div class="attack-item">                        
+                <div>Certificate Stealing</div>                        
+                <button onclick="executeCert()">Execute</button>
+            </div>
+            <div class="attack-item">                        
+                <div>Enumerate Server Hardware</div>
+                <button onclick="executeServenum()">Execute</button>                        
+            </div>
+            <div class="attack-item">                        
+                <div>Vulnerability Scan</div>
+                <button onclick="executeServuln()">Execute</button>
+            </div>
+        </div>                    
+    `;
+    break; 
+
+    case 'plugins':
+    title.textContent = 'plugins';
+    content.innerHTML = `
+        <h3>Plugins for Further Programs</h3>
+        <div class="attack-grid">
+            <div class="attack-item">         
+                <div>Ephemeral</div>
+                <button onclick="executeEphem()">Execute</button>
+            </div>
+            <div class="attack-item">
+                <div>BABEL</div>
+                <button onclick="executeBabel()">Execute</button>
+            </div>
+        </div>                    
+    `;
+    break; 
+                    case 'search':
+                    title.textContent = 'Search';
+                    content.innerHTML = `
+                        <h3>Search for Browsers</h3>
+                        <button onclick="executeSearch()">Execute</button>
+                    `;
+                    break;         
+                default:
+                    title.textContent = 'Select a Module';
+                    content.innerHTML = 'Please select a module from the sidebar';
+            }
+            
+            addLog(`[+] Module ${module} loaded`);
+        }
+        
+        function executeAttack() {
+            addLog('[!] Executing social engineering attack...');
+            addLog('[+] Attack successful! User credentials captured');
+        }
+        
+        function executeExploit() {
+            addLog('[!] Executing browser exploit...');
+            addLog('[+] Exploit successful! Session hijacked');
+        }
+
+//SOCIAL ENGINEERING        
+        function executeSocial() {
+    addLog(`[+] Executing social engineering attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+    setTimeout(function() {
+        addLog(`[+] Sending login page for ${targetApp}... `);
+        setTimeout(function() {
+            addLog('[+] Login page injected OK. Awaits response... ');
+            setTimeout(function() {
+                addLog(`[+] Attack successful! User credentials captured from ${selectedBrowser.ip}`);
+                addLog(`[+] Username: ${userName}`);
+                addLog(`[+] Password: ${passWord}`);
+            }, 1500); // 3rd timeout
+        }, 1500); // 2nd timeout
+    }, 1500); // 1st timeout
+}
+
+function executeUpdate() {
+    addLog(`[+] Executing social engineering attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Sending update notification for ${targetApp} on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Update notification delivered. Awaits response... ');
+       		        setTimeout(function() {
+       		            addLog('[+] Response captured!');
+    			        addLog('[+] Awaits system reboot for payload activation');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executePop() {
+    addLog(`[+] Executing social engineering attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Sending pop up to target ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Pop up delivered. Awaits response... ');
+       		        setTimeout(function() {
+       		            addLog('[+] Response captured!');
+    			        addLog('[+] ???');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeClick() {
+    addLog(`[+] Executing social engineering attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog('[+] Click-jack overlay active...');
+       	        setTimeout(function() {
+       	            addLog('[+] Awaits user response... ');
+       		        setTimeout(function() {
+       		            addLog('[+] Response captured!');
+    			        addLog('[+] ???');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeTab() {
+    addLog(`[+] Executing social engineering attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Identifying inactive tabs for ${selectedBrowser.browser}`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Inactive tab identified for ${targetApp}.`);
+       	            addLog('[+] Inserting login request page.');
+       		        setTimeout(function() {
+       		            addLog('[+] Login request page inserted.');
+    			        addLog('[+] Awaits user response.');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+//EXPLOITS        
+function executeLogger() {
+            addLog(`[!] Executing exploit on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog('[+] Identifying vulnerable process...');
+       	        setTimeout(function() {
+       	            addLog(`[+] Vulnerable process identified: ${vulnproc}`);
+       	            addLog('[+] Injecting keylogger software...');
+       		        setTimeout(function() {
+       		            addLog(`[+] Keylogger injected into ${vulnproc} `);
+    			        addLog('[+] Remote connection: Active');
+    			        addLog(`[+] Remote connection (IP): ${remIP}`);
+    			        addLog(`[+] Remote connection (Port): ${remPort}`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeMacenum() {
+        addLog(`[!] Executing exploit on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog('[+] Scanning for internal MAC addresses...');
+       	        setTimeout(function() {
+       	            addLog('[+] MAC addresses identified.');
+       	            addLog('[+] MAC enumeration: Active.');
+       		        setTimeout(function() {
+       		            addLog('[+] *IP Address* - *Device Type* (?-Guess / !-Known) - *MAC* (?/!)');
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeMacspoof() {
+    addLog(`[!] Executing exploit on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog('[+] Scanning for internal MAC addresses...');
+       	        setTimeout(function() {
+       	            addLog('[+] MAC addresses identified.');
+       	            addLog('[+] MAC overwrite:Active.');
+       		        setTimeout(function() {
+       		            addLog('[+] MAC Address until system reset/reboot.');
+       		            addLog('[+] MAC Address: AA-BB-CC-DD-EE-FF');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeDown() {
+    addLog(`[!] Executing exploit on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Locating file ${fileDown} ...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] File ${fileDown} located. Download commencing.`);
+       		        setTimeout(function() {
+       		            addLog(`[+] File ${fileDown} downloaded.`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeUplo() {
+    addLog(`[!] Executing exploit on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] File ${fileUp} for upload. Loaded OK.`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Obtaining file location. File location: ${fileLoc}`);
+       		        setTimeout(function() {
+       		            addLog(`[+] File ${fileUp} uploaded to ${fileLoc} OK.`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+//NETWORKS
+function executeRoutdet() {
+            addLog(`[!] Executing network attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Accessing router/gateway for ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Router/Gateway accessed at ${routIP}.`);
+       		        setTimeout(function() {
+       		            addLog('[+] *Router Data*');
+       		            addLog(`[+]  IP: ${routIP}`);
+       		            addLog(`[+]  MAC: ${routMAC}`);
+                        addLog(`[+]  Open ports: ${routPorts}`);
+       		            addLog(`[+]  Login creds: ${routLog}`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeRoutexp() {
+    addLog(`[!] Executing network attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Accessing router/gateway for ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+                    addLog(`[+] Router/Gateway accessed at ${routIP}.`);
+       		        setTimeout(function() {
+       		            addLog(`[+] Admin credential ${expCred} inserted.`);
+       		            addLog('[+] Port X opened. Masking from network: Active');
+       		            addLog(`[+] IP ${ipWhite} added to whitelist.`);
+       		            addLog(`[+] IP ${ipBlack} added to blacklist.`);
+       		            addLog('[+] Awaits system reboot to take effect.');
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeAvnets() {
+    addLog(`[!] Executing network attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Accessing available networks for ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+                    addLog(`[+] Cached network data for ${selectedBrowser.browser} accessed.`);
+       		        setTimeout(function() {
+       		            addLog(`[+] *Available Networks*`);
+       		            addLog(`[+] ${availNets}`);                        
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executePortint() {
+    addLog(`[!] Executing network attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog('[+] Internal port scan running...');
+       	        setTimeout(function() {
+       	            addLog('[+] Internal port scan complete.');
+       		        setTimeout(function() {
+       		            addLog('[+] *Open Ports*');
+		addLog('[+] 21 : FTP ; 22 : SSH ; 23 : Telnet ; 25 : SMTP (Simple Mail Transfer Protocol)');
+		addLog('[+] 53 : DNS (Domain Name System)');
+		addLog('[+] 80 : HTTP (Hypertext Transfer Protocol)');
+		addLog('[+] 110 : POP3 (Post Office Protocol version3) ; 135 : RPC (Remote Procedure Call)');
+		addLog('[+] 137 : NetBIOS Name Service ; 138 : NetBIOS Datagram Service');
+		addLog('[+] 139 : NetBIOS Session Service ; 143 : IMAP (Internet Message Access Protocol) ');
+		addLog('[+] 443 : HTTPS (HTTP Secure) ; 445 : SMB (Server Message Block)');
+		addLog('[+] 3389 : RDP (Remote Desktop Protocol)');
+addLog('[+] *PORTS CLOSED*');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executepoerext() {
+            addLog('[!] Executing network attack...');
+            setTimeout(function() {
+                addLog('[+] External port scan running...');
+       	        setTimeout(function() {
+       	            addLog('[+] External port scan complete.');
+       		        setTimeout(function() {
+       		            addLog('[+] *Open Ports*');
+		addLog('[+] 21 : FTP ; 22 : SSH ; 23 : Telnet ; 25 : SMTP (Simple Mail Transfer Protocol)');
+		addLog('[+] 53 : DNS (Domain Name System)');
+		addLog('[+] 80 : HTTP (Hypertext Transfer Protocol)');
+		addLog('[+] 110 : POP3 (Post Office Protocol version3) ; 135 : RPC (Remote Procedure Call)');
+		addLog('[+] 137 : NetBIOS Name Service ; 138 : NetBIOS Datagram Service');
+		addLog('[+] 139 : NetBIOS Session Service ; 143 : IMAP (Internet Message Access Protocol) ');
+		addLog('[+] 443 : HTTPS (HTTP Secure) ; 445 : SMB (Server Message Block)');
+		addLog('[+] 3389 : RDP (Remote Desktop Protocol)');
+addLog('[+] *PORTS CLOSED*');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeDnsenum() {
+    addLog(`[!] Executing network attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog('[+] Enumerating DNS...');
+       	        setTimeout(function() {
+       	            addLog('[+] Enumeration complete.');
+       		        setTimeout(function() {
+       		            	addLog('[+] Local DNS Server: LocalHost / **IP_ADDR**');
+				addLog('[+] Discovered hosts: [Subdomain 1].[Target Domain]: [Resolved IP Address] (Status: 200 OK - Likely exists)');
+				addLog('[+] Discovered hosts: [Subdomain 2].[Target Domain]: [Resolved IP Address] (Status: Connection Refused - Likely exists)');
+				addLog('[+] Discovered hosts: [Non-existent Subdomain].[Target Domain]: [No Resolution/Timeout] (Likely does not exist)');
+				addLog('[+] Discovered hosts: [Internal Hostname]: [Local IP Address] (Accessible from the browser)');
+				addLog('[+] Discovered mx records: [Target Domain]: [Potentially a list of inferred mail server IP addresses or hostnames]');
+				addLog('[+] Discovered txt records: [Target Domain]: [Potentially extracted TXT records if accessible]');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeDnsbind() {
+    addLog(`[!] Executing network attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection scan on ${selectedBrowser.browser}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] DNS record change to internal resource in process...');
+       		        setTimeout(function() {
+       		            	addLog('[+] DNS record rebound to internal resource.');
+       		            	addLog('[+] Internal resource now accessible to user.');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeNetpiv() {
+    addLog(`[!] Executing network attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Network connection scan on ${selectedBrowser.ip}`);
+                addLog(`[+] Current network: ${netHome}`);
+       	        setTimeout(function() {
+                    addLog(`[+] Scan: Complete. Accessing network connection: ${netConn}...`);
+       		        setTimeout(function() {
+                        addLog(`[+] Network pivot complete. Accessing ${netNew}`);
+                        addLog(`[+] Pivot point: ${netPt} `);
+                        addLog(`[+] Pivot method: ${netMeth} `);
+                        setTimeout(function() {
+                            addLog(`[+] Payload: ${payLoad} selected.`);
+                            addLog(`[+] Deployed on ${netNew}`);
+                            addLog(`[+] Awaits network restart/reboot.`);                        
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+},1500);
+}
+
+function executeOsdet() {
+    addLog(`[!] Executing device attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Detecting operating system for ${selectedBrowser.browser} running on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Detection complete.`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] Operating System for ${selectedBrowser.ip} is ${devOS}`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeHardfin() {
+    addLog(`[!] Executing device attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Fingerprinting hardware of ${selectedBrowser.browser} running on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Actions complete.');
+       		        setTimeout(function() {
+       		            	addLog('[+] *Hardware Results*');
+       		            	addLog(`[+]  ${hardWare}`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executePlugenum() {
+    addLog(`[!] Executing device attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Enumerating plugins for ${selectedBrowser.browser} running on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Actions complete.');
+       		        setTimeout(function() {
+       		            	addLog('[+] *Plugin installed on ${selectedBrowser.browser}*');
+       		            	addLog(`[+]  ${plugIns}`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executePlugexp() {
+    addLog(`[!] Executing device attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Assessing plugins installed on ${selectedBrowser.browser} running on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Targeting ${vulnPlug} for exploitation...`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] ${vulnPlug} successfully exploited!`);
+       		            	addLog(`[+] Awaits system reset.`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeVulndev() {
+    addLog(`[!] Executing device attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Running vulnerability scan against ${selectedBrowser.browser} running on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Actions complete.');
+       		        setTimeout(function() {
+       		            	addLog('[+] *Vulnerability Results*');
+       		            	addLog(`[+]  ${vulnRes}`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executePrivesc() {
+    addLog(`[!] Executing device attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Attempting local privilege escalation: ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Current user: Win User/STANDARD');
+       		        setTimeout(function() {
+       		            	addLog('[+] Current user: NT Authority/SYSTEM ');
+       		            	addLog('[+] *UNABLE TO ESCALATE!* ');
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeSesshij() {
+    addLog(`[!] Executing session attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Accessing sessions for ${selectedBrowser.browser} running on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Scanning for vulnerable session ID for hijack.');
+       	            addLog(`[+] Session ID ${sessID} identified as vulnerable to hijack.`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] Session ${sessID} hijack in progress...`);
+       		        	setTimeout(function() {
+       		            		addLog(`[+] Success! Session ${sessID} hijacked.`);
+       		            		addLog(`[+] Session stable and active.`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+    },1500);
+}
+
+function executeSessinj() {
+    addLog(`[!] Executing session attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Accessing sessions for ${selectedBrowser.browser} running on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Scanning for vulnerable session ID.`);
+       	            addLog(`[+] Session ID ${sessID} identified as vulnerable.`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] Creating exploit for injection.`);
+       		            	addLog(`[+] Exploit ${sessExp} created.`);
+       		        	setTimeout(function() {
+       		            		addLog(`[+] Session ${sessID} injected with ${sessExp}.`);
+       		            		addLog(`[+] Awaits next session call to activate.`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+    },1500);
+}
+
+function executeXss() {
+    addLog(`[!] Executing session attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Scanning ${selectedBrowser.browser} on ${selectedBrowser.ip} for input point.`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Input point located. Crafting payload: ${payLoad}`);
+       		    setTimeout(function() {
+       	            	addLog('[+] Injecting payload into input point.');
+			setTimeout(function() {
+       	            		addLog(`[+] Payload ${payLoad} successfully injected.`);
+       	            		addLog('[+] Awaits user interaction for call back.');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+},1500);
+}
+
+function executeCsrf() {
+    addLog(`[!] Executing session attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Crafting cross site request for ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Cross site request ${reqCsrf} sent to target ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] ${reqCsrf} successful.  `);
+       		            	addLog('[+] Awaits interaction. ');
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeCook() {
+    addLog(`[!] Executing session attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Identifying cookies associated with ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Session cookies identified.');
+       	            addLog('[+] Starting data extraction...');
+       		        setTimeout(function() {
+       		            	addLog('[+] Session cookie data successfully extracted.');
+       		            	addLog('[+] Data available. ');
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeScrape() {
+    addLog(`[!] Executing session attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Locating session storage for ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Data located.');
+       		        setTimeout(function() {
+       		            	addLog('[+] Data scrape successful! ');
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeSessfix() {
+    addLog(`[!] Executing session attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection to ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+                addLog(`[+] Creating session ID for session fixation attack...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Session ID ${malSess} created.`);
+       	            addLog(`[+] ${malSess} transferred to ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+       		        setTimeout(function() {
+       		            	addLog('[+] Success! Session fixation across browsers:Active.');
+       		            	addLog('[+] Awaits user interaction for call back.');
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeBrowfing() {
+    addLog(`[!] Executing browser attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection to ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+                addLog('[+] Fingerprinting browser... ');
+       	        setTimeout(function() {
+       	            addLog(`[+] Analysis complete on ${selectedBrowser.browser}.`);
+       		        setTimeout(function() {
+       		            	addLog('[+] *Browser Fingerprint*');
+       		            	addLog(`[+]  ${browFing}`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeDoscli() {
+    addLog(`[!] Executing browser attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection to ${selectedBrowser.ip}...`);
+                addLog('[+] Adding to virtual network infrastructure...');
+       	        setTimeout(function() {
+                	addLog(`[+] Browser connection to ${dosIP}:${dosPort}...`);
+       	            	addLog('[+] Rerouting traffic...');
+       		        setTimeout(function() {
+       		            	addLog(`[+] Success! Virtual network traffic rerouted.`);
+       		            	addLog(`[+] Virtual network traffic flow. Target: ${dosIP}:${dosPort} `);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeHist() {
+    addLog(`[!] Executing browser attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection to ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+                addLog('[+] Locating browser history...');
+       	        setTimeout(function() {
+       	            addLog('[+] Accessing browser history.');
+       		        setTimeout(function() {
+       		            	addLog('[+] Success! Browser history downloaded.');
+       		            	addLog(`[+] Success! Browser history accessible at ${remIP}:${remPort}`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeMitm() {
+    addLog(`[!] Executing browser attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection to ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+                addLog(`[+] Connection to ${mitmIP}:${mitmPort}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Connections made.');
+       	            addLog(`[+] Traffic flow between ${selectedBrowser.ip} and ${mitmIP}:${mitmPort}...`);
+       		        setTimeout(function() {
+       		            	addLog('[+] Success! Traffic flow detected. MitM:Active.');
+       		            	addLog('[+] Access to traffic flow via ssl');
+       		            	addLog(`[+] ${remIP}:${remPort}`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeBrowpiv() {
+    addLog(`[!] Executing browser attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection scan on ${selectedBrowser.browser}...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Browser pivot point established with ${selectedBrowser.browser}: ${pivotPt}`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] Browser pivot established. Method: ${pivotMeth}.`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeNetmap() {
+    addLog(`[!] Executing server attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Mapping ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Mapping ${selectedBrowser.browser}...`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] *Network for ${selectedBrowser.ip}:${selectedBrowser.browser}*`);
+       		            	addLog(`[+]  ${netMap}`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeDosserv() {
+    addLog(`[!] Executing server attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection to ${selectedBrowser.ip}:Server...`);
+                addLog('[+] Adding to virtual network infrastructure...');
+       	        setTimeout(function() {
+                	addLog(`[+] Browser connection to ${dosIP}:${dosPort}...`);
+       	            	addLog('[+] Rerouting traffic...');
+       		        setTimeout(function() {
+       		            	addLog('[+] Success! Virtual network traffic rerouted.');
+       		            	addLog(`[+] Virtual network traffic flow. Target: ${dosIP}:${dosPort} `);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeSsrf() {
+    addLog(`[!] Executing server attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Crafting server side request for ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog(`[+] Server side request ${reqSsrf} sent to target ${selectedBrowser.ip}`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] ${reqSsrf} successful.  `);
+       		            	addLog('[+] Awaits interaction. ');
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeCert() {
+    addLog(`[!] Executing server attack on target: ${selectedBrowser.ip} - ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Browser connection to ${selectedBrowser.browser} on ${selectedBrowser.ip}...`);
+                addLog(`[+] Browser connection to certificate store in ${selectedBrowser.browser}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Connections made.');
+       	            addLog(`[+] Certificate: ${certSteal} located in ${selectedBrowser.browser}.`);
+       		        setTimeout(function() {
+       		            	addLog(`[+] Success! Certificate: ${certSteal} copied.`);
+       		            	addLog(`[+] Success! Access to Certificate: ${certSteal} via ssl`);
+       		            	addLog(`[+] ${remIP}:${remPort}`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeServernum() {
+    addLog(`[!] Executing server attack on target: ${selectedBrowser.browser}`);
+            setTimeout(function() {
+                addLog(`[+] Enumerating server hardware for ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Actions complete.');
+       		        setTimeout(function() {
+       		            	addLog(`[+] *Server hardware for ${selectedBrowser.ip}*`);
+       		            	addLog(`[+]  ${servWare}`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeServuln() {
+            setTimeout(function() {
+                addLog(`[+] Running vulnerability scan against ${selectedBrowser.browser} running on ${selectedBrowser.ip}...`);
+       	        setTimeout(function() {
+       	            addLog('[+] Actions complete.');
+       		        setTimeout(function() {
+       		            	addLog('[+] *Vulnerability Results*');
+       		            	addLog(`[+]  ${ServulnRes}`);
+
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeEphem() {
+            setTimeout(function() {
+                addLog('[+] Ephemeral plug in loading...');
+       	        setTimeout(function() {
+                    addLog('[+] Accessing code base for plug in hooks...');
+       		        setTimeout(function() {
+                        addLog('[+] Ephemeral is now hooked into the browser.');
+                        addLog(`[!] Load Ephemeral with code ${plugEphem} to access!`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+
+function executeBabel() {
+            setTimeout(function() {
+                addLog('[+] BABEL plug in loading...');
+       	        setTimeout(function() {
+                    addLog('[+] Accessing code base for plug in hooks...');
+       		        setTimeout(function() {
+                        addLog('[+] BABEL is now hooked into the browser.');
+                        addLog(`[!] Load BABEL with code ${plugBabel} to access!`);
+            }, 1500); // Pause for 1500 milliseconds (1.5 seconds)
+	    },1500);
+    },1500);
+}
+    </script>
+</body>
+</html>

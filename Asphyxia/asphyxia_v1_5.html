@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asphyxia 1.3.7</title>
+    <style>
+        :root {
+            --success-color: #0f0;
+            --error-color: #f00;
+            --warning-color: #ff0;
+            --info-color: #0af;
+            --background-color: #000;
+            --text-color: #0f0;
+            --border-color: #333;
+            --progress-background: #222;
+            --progress-bar: #0a0;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        #terminal {
+            height: 90vh;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background-color: #111;
+        }
+        
+        #input-line {
+            display: flex;
+            margin-top: 10px;
+            align-items: center;
+        }
+        
+        #prompt {
+            margin-right: 10px;
+            /* Remove any cursor styling here */
+        }
+        
+        #command-input {
+            background-color: transparent;
+            border: none;
+            color: var(--text-color);
+            font-family: 'Courier New', monospace;
+            width: 100%;
+            outline: none;
+            caret-color: var(--text-color); /* This styles the native cursor */
+            flex-grow: 1;
+        }
+
+        /* Remove any ::after pseudo-element styling */
+        
+        .log-entry {
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+        
+        .success {
+            color: var(--success-color);
+        }
+        
+        .error {
+            color: var(--error-color);
+        }
+        
+        .warning {
+            color: var(--warning-color);
+        }
+        
+        .info {
+            color: var(--info-color);
+        }
+        
+        .progress-container {
+            width: 100%;
+            background-color: var(--progress-background);
+            margin: 10px 0;
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background-color: var(--progress-bar);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .file-list {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal"></div>
+    <div id="input-line">
+        <span id="prompt">asphyxia:~$</span>
+        <input type="text" id="command-input" autofocus>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            sshHost: "192.168.10.12", //Site being copied
+            sshUser: "admin", //ssh username for initial connection
+            sshPass: "***************", //ssh password for initial connection
+            mirrHost: "10.10.10.1", //Destination site for mirrored data 
+            mirrUser: "user_42137", //Destination site SSH username 
+            mirrPass: "*********" //Destination site SSH password
+        };
+
+        // DOM Elements
+        const elements = {
+            terminal: document.getElementById('terminal'),
+            commandInput: document.getElementById('command-input'),
+            prompt: document.getElementById('prompt')
+        };
+
+        // State management
+        const state = {
+        commandHistory: [],
+        historyPosition: 0,
+        searchedFiles: [] // Add this to store searched files
+    };
+
+    const commonExtensions = [
+        '.txt', '.docx', '.xlsx', '.pdf', 
+        '.jpg', '.png', '.exe', '.dll',
+        '.log', '.csv', '.sql', '.bak'
+    ];
+
+        // Initialize the terminal
+        function initTerminal() {
+            if (!elements.terminal || !elements.commandInput) {
+                console.error('Required DOM elements not found');
+                return;
+            }
+
+            displayWelcomeMessage();
+            setupEventListeners();
+        }
+
+        // Display welcome message and connection sequence
+        function displayWelcomeMessage() {
+            logEntry('Asphyxia 1.3.7 - Silent Mirror System', 'info');
+            logEntry('Copyright (c) Wasp Enterprises', 'info');
+            logEntry(' * - * - * - * - * - * - * - * - * ', 'info');
+            logEntry('Initializing secure connection...', 'info');
+            logEntry(' * - * - * - * - * - * - * - * - * ', 'info');
+
+            const connectionSequence = [
+                { delay: 1500, text: `Establishing Connection to ${config.sshHost}.`, type: 'success' },
+                { delay: 3000, text: `Connecting to ${config.sshHost}...`, type: 'success' },
+                { delay: 4500, text: `Trying ${config.sshHost}...`, type: 'success' },
+                { delay: 7500, text: `Connected to ${config.sshHost}`, type: 'success' },
+                { delay: 9000, text: `${config.sshUser}@${config.sshHost}'s password: ${config.sshPass}`, type: 'success' },
+                { delay: 11000, text: 'Verifying identity...', type: 'success' },
+                { delay: 14000, text: 'Establishing secure channel...', type: 'success' },
+                { delay: 15500, text: 'Authentication successful.', type: 'success' },
+                { delay: 17000, text: `Welcome to ${config.sshHost}`, type: 'success' },
+                { delay: 18500, text: `${config.sshUser}@${config.sshHost}:~$`, type: 'success' },
+                { delay: 20000, text: 'Connection established. Encryption active.', type: 'success' },
+                { delay: 21500, text: ' * - * - * - * - * - * - * - * - * ', type: 'info' }
+            ];
+
+            connectionSequence.forEach(step => {
+                setTimeout(() => logEntry(step.text, step.type), step.delay);
+            });
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            elements.commandInput.addEventListener('keydown', handleKeyDown);
+        }
+
+        // Handle keyboard input
+        function handleKeyDown(e) {
+            if (e.key === 'Enter') {
+                processCommand();
+            } else if (e.key === 'ArrowUp') {
+                navigateHistory(-1);
+            } else if (e.key === 'ArrowDown') {
+                navigateHistory(1);
+            }
+        }
+
+        // Process entered command
+        function processCommand() {
+            const commandText = elements.commandInput.value.trim();
+            if (!commandText) return;
+
+            logEntry(`asphyxia:~$ ${commandText}`, 'info');
+            state.commandHistory.push(commandText);
+            state.historyPosition = state.commandHistory.length;
+
+            const [command, ...args] = commandText.split(' ');
+            const argument = args.join(' ');
+
+            executeCommand(command, argument);
+            elements.commandInput.value = '';
+        }
+
+        // Execute a command
+        function executeCommand(command, arg) {
+            if (commands[command]) {
+                commands[command](arg);
+            } else {
+                logEntry(`Command not found: ${command}`, 'error');
+            }
+        }
+
+        // Navigate command history
+        function navigateHistory(direction) {
+            if (direction === -1 && state.historyPosition > 0) {
+                state.historyPosition--;
+                elements.commandInput.value = state.commandHistory[state.historyPosition];
+            } else if (direction === 1 && state.historyPosition < state.commandHistory.length - 1) {
+                state.historyPosition++;
+                elements.commandInput.value = state.commandHistory[state.historyPosition];
+            } else if (direction === 1) {
+                state.historyPosition = state.commandHistory.length;
+                elements.commandInput.value = '';
+            }
+        }
+
+        // Available commands
+        const commands = {
+        'help': () => {
+            logEntry('Available commands:', 'info');
+            logEntry('site [ip] - Select destination for mirrored data (Default: 10.10.10.1)', 'info');
+            logEntry('search [files] - Set search for specific files (e.g. "search file1 file2.txt")', 'info');
+            logEntry('compression [rate] - Apply custom compression rate', 'info');
+            logEntry('mirror [ip] - Begin silent mirroring of target', 'info');
+            logEntry('wipe - Remove all traces', 'info');
+            logEntry('exit - Terminate session', 'info');
+        },
+'search': (files) => {
+            if (!files) {
+                logEntry('Usage: search [file1] [file2.ext] [file3] ...', 'error');
+                return;
+            }
+            
+            // Clear previous search
+            state.searchedFiles = [];
+            
+            // Process each file pattern
+            const filePatterns = files.split(' ');
+            for (const pattern of filePatterns) {
+                if (pattern.includes('.')) {
+                    // File has extension - use as is
+                    state.searchedFiles.push(pattern);
+                } else {
+                    // File has no extension - add wildcard
+                    state.searchedFiles.push(`${pattern}.*`);
+                }
+            }
+            
+            logEntry(`Search function set for: ${state.searchedFiles.join(' ')}`, 'success');
+        },
+
+        'mirror': (ip) => {
+            if (!ip) {
+                logEntry('Usage: mirror [ip]', 'error');
+                return;
+            }
+            logEntry(`Initiating silent mirror on ${ip}...`, 'warning');
+            
+            const progressContainer = document.createElement('div');
+            progressContainer.className = 'progress-container';
+            const progressBar = document.createElement('div');
+            progressBar.className = 'progress-bar';
+            progressContainer.appendChild(progressBar);
+            elements.terminal.appendChild(progressContainer);
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 5;
+                if (progress > 100) progress = 100;
+                progressBar.style.width = `${progress}%`;
+                
+                if (progress === 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        logEntry('Mirroring complete. Full system access achieved.', 'success');
+                        logEntry('File system captured:', 'info');
+                        
+                        const fileList = document.createElement('div');
+                        fileList.className = 'file-list';
+                        
+                        // Generate file list based on searched files or default if none
+                        let filesHtml = '';
+                        if (state.searchedFiles.length > 0) {
+                            filesHtml += '<div>C:/SearchedFiles/</div>';
+                            for (const pattern of state.searchedFiles) {
+                                if (pattern.endsWith('.*')) {
+                                    // For wildcard patterns, pick a random extension
+                                    const baseName = pattern.slice(0, -2);
+                                    const ext = commonExtensions[Math.floor(Math.random() * commonExtensions.length)];
+                                    filesHtml += `<div>&nbsp;&nbsp;- ${baseName}${ext}</div>`;
+                                } else {
+                                    // Exact filename
+                                    filesHtml += `<div>&nbsp;&nbsp;- ${pattern}</div>`;
+                                }
+                            }
+                        } else {
+                            // Default files if no search was performed
+                            filesHtml = `
+                                <div>C:/Users/Admin/Documents/</div>
+                                <div>&nbsp;&nbsp;- financial_records.xlsx</div>
+                                <div>&nbsp;&nbsp;- passwords.kdbx</div>
+                                <div>C:/Program Files/</div>
+                                <div>&nbsp;&nbsp;- SecurityTools/</div>
+                                <div>&nbsp;&nbsp;&nbsp;&nbsp;- firewall.exe</div>
+                                <div>&nbsp;&nbsp;&nbsp;&nbsp;- antivirus.exe</div>
+                            `;
+                        }
+                        
+                        fileList.innerHTML = filesHtml;
+                        elements.terminal.appendChild(fileList);
+                        
+                        logEntry('Mirror complete. Data set by Search function prioritised.', 'success');
+                    }, 500);
+                }
+            }, 200);
+        },
+
+            'site': (ip) => {
+    if (!ip) {
+        logEntry('Usage: site [ip]', 'error');
+        return;
+    }
+    displayMirrorMessage(ip);
+},  // This comma was missing
+
+
+            'compression': (rate) => {
+                if (!rate) {
+                    logEntry('Usage: compression [rate]', 'error');
+                    return;
+                }
+                logEntry(`Compression of data set to ${rate}`, 'warning');
+                
+                setTimeout(() => {
+                    logEntry('Compression rate applied.', 'success');
+                    logEntry('Data transfer active.', 'success');
+                }, 3000);
+            },
+            'wipe': () => {
+                logEntry('Initiating trace removal protocol...', 'warning');
+                
+                setTimeout(() => {
+                    logEntry('Log files erased.', 'success');
+                    logEntry('Network traces obfuscated.', 'success');
+                    logEntry('All connections sanitized.', 'success');
+                    logEntry('System clean. No evidence remains.', 'success');
+                }, 2500);
+            },
+            'exit': () => {
+                logEntry('Terminating session...', 'info');
+                elements.commandInput.disabled = true;
+                
+                setTimeout(() => {
+                    elements.terminal.innerHTML = '';
+                    logEntry('Session terminated. Connection closed.', 'info');
+                    logEntry('To restart, refresh the page.', 'info');
+                }, 1000);
+            },
+            'clear': () => {
+                elements.terminal.innerHTML = '';
+            }
+        };
+
+        // Helper function to add log entries
+        function logEntry(text, type) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = text;
+            elements.terminal.appendChild(entry);
+            elements.terminal.scrollTop = elements.terminal.scrollHeight;
+        }
+
+// Move this function outside the commands object
+function displayMirrorMessage(ip) {
+    // Store the original host for potential restoration
+    const originalMirrHost = config.mirrHost;
+    
+    // If IP is provided, update the config temporarily
+    if (ip) {
+        config.mirrHost = ip;
+        logEntry(`Using specified target: ${ip}`, 'info');
+    }
+
+    const mirrSequence = [
+        { delay: 1500, text: `Establishing Connection to ${config.mirrHost}...`, type: 'success' },
+        { delay: 3000, text: `Connecting to ${config.mirrHost}...`, type: 'success' },
+        { delay: 4500, text: `Trying ${config.mirrHost}...`, type: 'success' },
+        { delay: 7500, text: `Connected to ${config.mirrHost}`, type: 'success' },
+        { delay: 9000, text: `${config.mirrUser}@${config.mirrHost}'s password: ${'*'.repeat(config.mirrPass.length)}`, type: 'success' },
+        { delay: 11000, text: 'Verifying identity...', type: 'success' },
+        { delay: 14000, text: 'Establishing secure channel...', type: 'success' },
+        { delay: 15500, text: 'Authentication successful.', type: 'success' },
+        { delay: 17000, text: `Welcome to ${config.mirrHost}`, type: 'success' },
+        { delay: 18500, text: `${config.mirrUser}@${config.mirrHost}:~$`, type: 'success' },
+        { delay: 20000, text: 'Connection established. Encryption active.', type: 'success' },
+        { delay: 21500, text: ' * - * - * - * - * - * - * - * - * ', type: 'info' }
+    ];
+
+    mirrSequence.forEach(step => {
+        setTimeout(() => logEntry(step.text, step.type), step.delay);
+    });
+
+    // Restore original host after sequence completes
+    setTimeout(() => {
+        if (ip) {
+            config.mirrHost = originalMirrHost;
+            logEntry('Connection OK. Data Transfer OK. ', 'info');
+            logEntry(`Reverting to default target: ${originalMirrHost} for future connections.`, 'info');
+        }
+    }, 22000);
+    }
+
+        // Initialize the application
+        initTerminal();
+    </script>
+</body>
+</html>

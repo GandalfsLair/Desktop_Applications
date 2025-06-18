@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cobalt Strike UI</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="network-container">
+        <div class="attacker" id="attacker">LocalHost</div>
+        <!-- Initial devices will be added dynamically -->
+    </div>
+    
+    <div class="state-panel">
+        <h3>Device Information</h3>
+        <div id="device-info" class="device-info">Select a device to view details.</div>
+        <h3>Compromised Devices</h3>
+        <ul id="device-status-list"></ul>
+        <h3>Network Links</h3>
+        <ul id="network-links"></ul>
+        <h3>Command Reference</h3>
+        <div id="command-help" class="command-help"></div>
+    </div>
+    
+    <div class="command-log" id="command-log"></div>
+    
+    <div class="cli-container">
+        <input type="text" class="cli-input" id="cli" placeholder="Enter command..." autofocus>
+    </div>
+    
+    <script src="network.js"></script>
+    <script src="commands.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

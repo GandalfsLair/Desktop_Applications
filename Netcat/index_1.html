@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Netcat Simulator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: black;
+      color: #00ffff; /* Cyan text for netcat */
+      font-family: "Courier New", Courier, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .terminal {
+      width: 80%;
+      height: 70%;
+      max-width: 900px;
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+      display: flex;
+      flex-direction: column;
+    }
+    .output {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    .input-line {
+      display: flex;
+      align-items: center;
+    }
+    .prompt {
+      color: #00ffff;
+    }
+    .user-input {
+      background: transparent;
+      border: none;
+      color: #00ffff;
+      outline: none;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 1rem;
+      width: 100%;
+    }
+    .connection-status {
+      margin-bottom: 10px;
+      padding: 5px;
+      border-radius: 3px;
+      text-align: center;
+    }
+    .connected {
+      background-color: rgba(0, 255, 0, 0.2);
+      color: #00ff00;
+    }
+    .disconnected {
+      background-color: rgba(255, 0, 0, 0.2);
+      color: #ff0000;
+    }
+  </style>
+</head>
+<body>
+  <div class="terminal">
+    <h1 style="text-align: center;">Netcat - TCP-IP Swiss Army Knife</h1>
+    <div id="connectionStatus" class="connection-status disconnected">[DISCONNECTED]</div>
+    <div id="output" class="output"></div>
+    <div class="input-line">
+      <span class="prompt">nc> </span>
+      <input type="text" id="userInput" class="user-input" autofocus />
+    </div>
+  </div>
+
+  <script>
+    // Connection state
+    let isConnected = false;
+    let currentConnection = null;
+    let listenPort = null;
+    let isListening = false;
+    
+    // Event listener for user input
+    document.getElementById('userInput').addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        const userInput = event.target.value.trim();
+        event.target.value = ''; // Clear input
+        appendOutput(`nc> ${userInput}`);
+        runNetcatCommand(userInput);
+      }
+    });
+
+    // Main command parsing function
+    function runNetcatCommand(command) {
+      const parts = command.trim().split(/\s+/);
+      
+      // Validate that the command starts with "nc"
+      if (parts[0] !== "nc") {
+        displayError("Invalid command. Please start with 'nc'.");
+        return;
+      }
+
+      // Clear command
+      if (parts.length === 2 && parts[1].toLowerCase() === "clear") {
+        clearScreen();
+        return;
+      }
+
+      // Help command
+      if (parts.length === 2 && parts[1].toLowerCase() === "help") {
+        showHelp();
+        return;
+      }
+
+      // Close connection command
+      if (parts.length === 2 && parts[1].toLowerCase() === "close") {
+        closeConnection();
+        return;
+      }
+
+      // Check for connection modes
+      if (parts.includes("-l") || parts.includes("-L")) {
+        // Listen mode
+        handleListenMode(parts);
+      } else if (parts.includes("-e")) {
+        // Execute command mode
+        handleExecuteMode(parts);
+      } else if (parts.includes("-z")) {
+        // Port scanning mode
+        handlePortScan(parts);
+      } else if (parts.length >= 3) {
+        // Standard connection mode (host port)
+        handleStandardConnection(parts);
+      } else {
+        displayError("Invalid command. Usage examples:\n" +
+                    "  nc -l -p 1234 (listen on port)\n" +
+                    "  nc 192.168.1.1 80 (connect to host:port)\n" +
+                    "  nc -z 192.168.1.1 20-80 (port scan)");
+      }
+    }
+
+    function handleListenMode(parts) {
+      const portIndex = parts.indexOf("-p") + 1;
+      const port = parts[portIndex];
+      
+      if (!port || isNaN(port)) {
+        displayError("Please specify a valid port with -p");
+        return;
+      }
+
+      listenPort = port;
+      isListening = true;
+      updateConnectionStatus();
+      
+      appendOutput(`Listening on [0.0.0.0]:${port}`);
+      appendOutput("Waiting for connection...");
+      
+      // Simulate incoming connection after delay
+      simulateDelay(() => {
+        if (isListening) {
+          isConnected = true;
+          currentConnection = {
+            ip: "192.168." + Math.floor(Math.random() * 255) + "." + Math.floor(Math.random() * 255),
+            port: port
+          };
+          updateConnectionStatus();
+          appendOutput(`Connection received from [${currentConnection.ip}]:${Math.floor(Math.random() * 60000)}`);
+          appendOutput("Type 'nc close' to end connection");
+        }
+      }, 2000, 5000);
+    }
+
+    function handleStandardConnection(parts) {
+      const host = parts[1];
+      const port = parts[2];
+      
+      if (!host || !port) {
+        displayError("Please specify both host and port");
+        return;
+      }
+      
+      if (isNaN(port)) {
+        displayError("Port must be a number");
+        return;
+      }
+
+      isConnected = true;
+      currentConnection = { ip: host, port: port };
+      updateConnectionStatus();
+      
+      appendOutput(`Connecting to ${host}:${port}...`);
+      
+      simulateDelay(() => {
+        if (isConnected) {
+          appendOutput(`Connection established to ${host}:${port}`);
+          appendOutput("Type 'nc close' to end connection");
+          
+          // Simulate banner if connecting to common ports
+          if (port == "80") {
+            simulateDelay(() => {
+              appendOutput("HTTP/1.1 200 OK\nServer: Apache/2.4.41\nContent-Type: text/html");
+            }, 500, 1500);
+          } else if (port == "22") {
+            simulateDelay(() => {
+              appendOutput("SSH-2.0-OpenSSH_8.4p1 Ubuntu-5");
+            }, 500, 1500);
+          }
+        }
+      }, 1000, 3000);
+    }
+
+    function handlePortScan(parts) {
+      const host = parts[2];
+      const portRange = parts[3];
+      
+      if (!host || !portRange) {
+        displayError("Please specify host and port range (e.g., 20-80)");
+        return;
+      }
+      
+      appendOutput(`Scanning ${host} [${portRange}]`);
+      
+      // Parse port range
+      let startPort, endPort;
+      if (portRange.includes("-")) {
+        [startPort, endPort] = portRange.split("-").map(Number);
+      } else {
+        startPort = endPort = Number(portRange);
+      }
+      
+      if (isNaN(startPort) || isNaN(endPort)) {
+        displayError("Invalid port range");
+        return;
+      }
+      
+      // Simulate scan with random open ports
+      const openPorts = [];
+      const totalPorts = endPort - startPort + 1;
+      const maxOpenPorts = Math.min(10, Math.floor(totalPorts * 0.2));
+      
+      // Generate some random open ports
+      for (let i = 0; i < maxOpenPorts; i++) {
+        const port = startPort + Math.floor(Math.random() * (endPort - startPort + 1));
+        if (!openPorts.includes(port)) {
+          openPorts.push(port);
+        }
+      }
+      
+      // Sort open ports
+      openPorts.sort((a, b) => a - b);
+      
+      // Simulate scanning progress
+      let scanned = 0;
+      const totalToScan = endPort - startPort + 1;
+      const batchSize = Math.max(1, Math.floor(totalToScan / 10));
+      
+      const scanInterval = setInterval(() => {
+        const batchEnd = Math.min(scanned + batchSize, totalToScan);
+        
+        for (let i = scanned; i < batchEnd; i++) {
+          const port = startPort + i;
+          if (openPorts.includes(port)) {
+            appendOutput(`${host}:${port} open`);
+          }
+        }
+        
+        scanned = batchEnd;
+        
+        if (scanned >= totalToScan) {
+          clearInterval(scanInterval);
+          appendOutput(`Scan complete. Found ${openPorts.length} open ports.`);
+          appendOutput(" - - - ");
+        }
+      }, 300);
+    }
+
+    function handleExecuteMode(parts) {
+      const commandIndex = parts.indexOf("-e") + 1;
+      const command = parts.slice(commandIndex).join(" ");
+      
+      if (!command) {
+        displayError("Please specify a command after -e");
+        return;
+      }
+      
+      if (!isConnected) {
+        displayError("Not connected to any host");
+        return;
+      }
+      
+      appendOutput(`Executing on ${currentConnection.ip}: ${command}`);
+      
+      simulateDelay(() => {
+        // Simulate command output
+        if (command.includes("ls")) {
+          appendOutput("bin   dev  home  lib32  libx32  mnt  proc  run   srv  tmp  var\n" +
+                      "boot  etc  lib   lib64  media   opt  root  sbin  sys  usr");
+        } else if (command.includes("whoami")) {
+          appendOutput("root");
+        } else if (command.includes("uname")) {
+          appendOutput("Linux");
+        } else if (command.includes("pwd")) {
+          appendOutput("/");
+        } else {
+          appendOutput(`Command '${command}' executed`);
+        }
+      }, 1000, 2000);
+    }
+
+// Improved closeConnection function
+function closeConnection() {
+  if (!isConnected && !isListening) {
+    displayError("No active connection to close");
+    return;
+  }
+
+  if (isConnected) {
+    appendOutput(`Closing connection to ${currentConnection.ip}:${currentConnection.port}`);
+    // Simulate connection termination delay
+    simulateDelay(() => {
+      appendOutput(`Connection to ${currentConnection.ip} closed`);
+    }, 500, 1000);
+  }
+
+  if (isListening) {
+    appendOutput(`Stopping listener on port ${listenPort}`);
+    // Simulate listener stopping delay
+    simulateDelay(() => {
+      appendOutput(`Stopped listening on port ${listenPort}`);
+    }, 500, 1000);
+  }
+
+  // Reset all connection states
+  isConnected = false;
+  isListening = false;
+  currentConnection = null;
+  listenPort = null;
+  updateConnectionStatus();
+}
+
+    function updateConnectionStatus() {
+      const statusDiv = document.getElementById("connectionStatus");
+      
+      if (isConnected) {
+        statusDiv.textContent = `[CONNECTED] ${currentConnection.ip}:${currentConnection.port}`;
+        statusDiv.className = "connection-status connected";
+      } else if (isListening) {
+        statusDiv.textContent = `[LISTENING] 0.0.0.0:${listenPort}`;
+        statusDiv.className = "connection-status connected";
+      } else {
+        statusDiv.textContent = "[DISCONNECTED]";
+        statusDiv.className = "connection-status disconnected";
+      }
+    }
+
+    function showHelp() {
+      appendOutput("Netcat Simulator Help:");
+      appendOutput("---------------------");
+      appendOutput("nc [options] [host] [port]");
+      appendOutput("");
+      appendOutput("Options:");
+      appendOutput("  -l -p <port>    Listen mode, specify port");
+      appendOutput("  -L -p <port>    Persistent listen mode (simulated)");
+      appendOutput("  -z <host> <port-range>  Port scanning mode");
+      appendOutput("  -e <command>    Execute command on connected host");
+      appendOutput("  close           Close current connection");
+      appendOutput("  clear           Clear the terminal");
+      appendOutput("  help            Show this help");
+      appendOutput("");
+      appendOutput("Examples:");
+      appendOutput("  nc -l -p 4444          Listen on port 4444");
+      appendOutput("  nc 192.168.1.1 80      Connect to host on port 80");
+      appendOutput("  nc -z 192.168.1.1 20-80  Scan ports 20-80");
+      appendOutput("  nc close               Close current connection");
+    }
+
+    // Output helper functions
+    function displayOutput(text) {
+      const outputDiv = document.getElementById("output");
+      const p = document.createElement("p");
+      p.innerText = text;
+      outputDiv.appendChild(p);
+      outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+    
+    function displayError(message) {
+      const outputDiv = document.getElementById("output");
+      const p = document.createElement("p");
+      p.innerText = `Error: ${message}`;
+      p.style.color = "#ff5555";
+      outputDiv.appendChild(p);
+      outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+    
+    function appendOutput(text) {
+      const outputDiv = document.getElementById("output");
+      outputDiv.innerHTML += `<div>${text}</div>`;
+      outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+    
+    function clearScreen() {
+      document.getElementById("output").innerHTML = "";
+    }
+    
+    function simulateDelay(callback, minDelay = 500, maxDelay = 2000) {
+      setTimeout(callback, Math.random() * (maxDelay - minDelay) + minDelay);
+    }
+
+    // Initial help message
+    appendOutput("Netcat Simulator - Type 'nc help' for usage information");
+    appendOutput(" - - - ");
+  </script>
+</body>
+</html>

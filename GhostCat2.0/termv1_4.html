@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudCat Terminal</title>
+    <style>
+        /* Terminal Styling */
+        body {
+            background-color: #121212;
+            color: #f0f0f0;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 10px;
+            background-color: #172a45;
+            border-bottom: 1px solid #64ffda;
+            font-size: 0.8rem;
+        }
+        
+        .connection-status {
+            color: #50fa7b;
+        }
+        
+        .alert {
+            color: #ff5555;
+        }
+        
+        #terminal {
+            height: calc(100% - 60px);
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        #input-line {
+            display: flex;
+            padding: 0 20px 20px;
+        }
+        
+        #prompt {
+            margin-right: 10px;
+            color: #64ffda;
+            white-space: nowrap;
+        }
+        
+        .prompt-user {
+            color: #64ffda;
+            margin-right: 5px;
+        }
+        
+        .prompt-host {
+            color: #50fa7b;
+            margin-right: 5px;
+        }
+        
+        .prompt-path {
+            color: #8892b0;
+            margin-right: 5px;
+        }
+        
+        #command-input {
+            background-color: transparent;
+            border: none;
+            color: #f0f0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            width: 100%;
+            outline: none;
+            caret-color: #64ffda;
+        }
+        
+        .output {
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+        }
+        
+        .log-entry {
+            border-left: 2px solid #172a45;
+            padding-left: 10px;
+            margin-bottom: 5px;
+            color: #8892b0;
+        }
+        
+        .log-time {
+            color: #64ffda;
+            margin-right: 10px;
+        }
+        
+        .success {
+            color: #50fa7b;
+        }
+        
+        .error {
+            color: #ff5555;
+        }
+        
+        .warning {
+            color: #FFC107;
+        }
+        
+        .info {
+            color: #2196F3;
+        }
+        
+        .system {
+            color: #9C27B0;
+        }
+        
+        .highlight {
+            color: #FF5722;
+        }
+        
+        .command {
+            color: #f0f0f0;
+        }
+        .loading-bar {
+    display: inline-block;
+    background: #444;
+    width: 300px;
+    height: 18px;
+    position: relative;
+    margin-left: 10px;
+}
+.loading-fill {
+    background: #50fa7b;
+    height: 100%;
+    width: 0%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: width 2s linear;
+}
+#popup-container {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.95);
+    border: 2px solid #64ffda;
+    color: #64ffda;
+    padding: 20px 30px;
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    box-shadow: 0 0 15px #64ffda88;
+    border-radius: 8px;
+    z-index: 9999;
+    max-width: 70%;
+    white-space: pre-wrap;
+    text-align: center;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translate(-50%, -20%); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+    </style>
+</head>
+<body>
+    <!-- Status bar -->
+    <div class="status-bar">
+        <div>CloudCat v2.3.7 // Secure Session</div>
+        <div class="connection-status">ENCRYPTED [AES-256]</div>
+        <div>USER: <span id="current-user">agent_47</span></div>
+    </div>
+    
+    <div id="terminal"></div>
+    <div id="input-line">
+        <span id="prompt">
+            <span class="prompt-user">user</span>@
+            <span class="prompt-host">ghostnet</span>:
+            <span class="prompt-path">~/</span>$
+        </span>
+        <input type="text" id="command-input" autofocus>
+    </div>
+
+    <script>
+        // CloudCat Terminal Simulation
+        document.addEventListener('DOMContentLoaded', function() {
+            const terminal = document.getElementById('terminal');
+            const commandInput = document.getElementById('command-input');
+            const prompt = document.getElementById('prompt');
+            const specificIP = "172.16.254.1";
+            
+            // Configuration object for the simulator
+            const config = {
+                user: 'user',
+                host: 'ghostnet',
+                path: '~/',
+                targetNetwork: '10.42.0.0/24',
+                activeSessions: [
+                    { id: 'srv-web-01', ip: '10.42.0.45', ports: [22, 80, 443], status: 'active' },
+                    { id: 'db-backup-02', ip: '10.42.0.78', ports: [22, 3306], status: 'active' },
+                    { id: 'fw-admin', ip: '10.42.0.1', ports: [22, 8080], status: 'standby' }
+                ],
+                commands: {
+                    'scan': {
+                        description: 'Scan target network for active hosts',
+                        execute: executeNetworkScan
+                    },
+                    'list': {
+                        description: 'List active hosts on target network',
+                        execute: executeNetworkList
+                    },
+                    'probe': {
+                        description: 'Probe a host for open ports',
+                        execute: executePortProbe
+                    },
+                    'interface': {
+                        description: 'Change the Virtual Cloud Interface',
+                        execute: executeInterface 
+                    },
+                    'mac': {
+                        description: 'Change the Virtual MAC address',
+                        execute: executeMAC
+                    },                    
+                    'exploit': {
+                        description: 'Exploit a vulnerability on target host',
+                        execute: executeExploit
+                    },
+                    'exfiltrate': {
+                        description: 'Exfiltrate data from target',
+                        execute: executeExfiltration
+                    },
+                    'backdoor': {
+                        description: 'Deploy backdoor on target',
+                        execute: deployBackdoor
+                    },
+                    'connect': {
+                        description: 'Connect to a target session',
+                        execute: connectToSession
+                    },
+                    'cert-steal': {
+                        description: 'Steal SSL/TLS certificates from target',
+                        execute: certSteal
+                    },
+                    'proxy-chain': {
+                        description: 'Route traffic through proxy nodes',
+                        execute: proxyChain
+                    },
+                    'ssh-connect': {
+                        description: 'Simulate SSH connection with handshake',
+                        execute: simulateSSHSteps
+                    },
+                    'cloud-route': {
+                        description: 'Route through cloud instances',
+                        execute: cloudRoute
+                    },
+                    'help': {
+                        description: 'Show available commands',
+                        execute: showHelp
+                    },
+                    'clear': {
+                        description: 'Clear the terminal',
+                        execute: clearTerminal
+                    },
+                    'metadata': {
+                        description: 'Show metadata for current/service',
+                        execute: handleMetadata
+                    },
+                    'tunnel': {
+                        description: 'Create tunnel between resources',
+                        execute: handleTunnel
+                    },
+                    'exfil': {
+                        description: 'Exfiltrate data from source to destination',
+                        execute: handleExfil
+                    },
+                    'shell': {
+                        description: 'Open shell on target instance',
+                        execute: handleShell
+                    },
+                    'env': {
+                        description: 'Show current environment info',
+                        execute: showEnvironment
+                    },
+                    'services': {
+                        description: 'List discovered services',
+                        execute: listServices
+                    },
+                    'history': {
+                        description: 'Show command history',
+                        execute: showHistory
+                    },
+                    'listen': {
+                        description: 'Start a listener on a port',
+                        execute: handleListen
+                    },
+                    'send': {
+                        description: 'Send data to a remote host',
+                        execute: handleSend
+                    },
+                    'auto_tunnel': {
+                        description: 'automatic tunnel wizard',
+                        execute: autotunnel
+                    },
+                    'auto_test': {
+                        description: 'Automatic test wizard',
+                        execute: autotest
+                    },
+                    'auto_listen': {
+                        description: 'Automatic listener wizard',
+                        execute: autolisten
+                    },
+                    'auto_proxy': {
+                        description: 'Automatic proxy wizard',
+                        execute: autoproxy
+                    },
+                    'firewall': {
+                        description: "Firewall bypass tools",
+                        usage: "firewall <bypass|knock> [target] [options]",
+                        execute: (args) => {
+                            if (args.length < 1) {
+                                addOutput("Usage: firewall <bypass|knock> [target] [options]", 'error');
+                                return;
+                            }
+
+                            const action = args[0].toLowerCase();
+                            if (action === "bypass") {
+                                bypassFirewall(args.slice(1));
+                            } else if (action === "knock") {
+                                portKnock(args.slice(1));
+                            } else {
+                                addOutput("Invalid action. Use 'bypass' or 'knock'", 'error');
+                            }
+                        }
+                    },
+
+                }
+            };
+            
+            // Cloud environment detection
+            let currentCloud = 'unknown';
+            let connectedInstances = [];
+            let lastScanResults = [];
+            
+            // Command history
+            let commandHistory = [];
+            let historyIndex = -1;
+            
+            // Listener state
+            let listeners = [];
+            
+            // Initial banner
+            printBanner();
+            
+            // Focus input on any click in terminal
+            terminal.addEventListener('click', function() {
+                commandInput.focus();
+            });
+            
+            // Handle command input
+            commandInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const command = commandInput.value.trim();
+                    if (command) {
+                        executeCommand(command);
+                        commandHistory.push(command);
+                        historyIndex = commandHistory.length;
+                        commandInput.value = '';
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    // Navigate command history
+                    if (commandHistory.length > 0) {
+                        if (historyIndex > 0) historyIndex--;
+                        commandInput.value = commandHistory[historyIndex] || '';
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    // Navigate command history
+                    if (commandHistory.length > 0) {
+                        if (historyIndex < commandHistory.length - 1) historyIndex++;
+                        commandInput.value = commandHistory[historyIndex] || '';
+                    } else {
+                        commandInput.value = '';
+                    }
+                } else if (e.key === 'Tab') {
+                    // Tab completion
+                    e.preventDefault();
+                    handleTabCompletion(commandInput.value);
+                }
+            });
+            
+            // Print initial banner
+            function printBanner() {
+                const banner = `
+  ____ _                 _   ____      _   
+ / ___| | ___  _   _  __| | / ___|__ _| |_ 
+| |   | |/ _ \\| | | |/ _\` | |   / _\` | __|
+| |___| | (_) | |_| | (_| | |__| (_| | |_ 
+ \\____|_|\\___/ \\__,_|\\__,_|\\____\\__,_|\\__|
+                                           
+CloudCat v2.3.7 - Cloud Penetration Toolkit
+
+Type 'help' for available commands
+Auto-detecting cloud environment...
+    `;
+                addOutput(banner, 'system');
+
+                const connectionLogs = [
+                    { message: `Initializing CloudCat protocol...`, class: 'log-entry' },
+                    { message: `Establishing secure connection...`, class: 'log-entry' },
+                    { message: `Handshake complete. Session encrypted with AES-256.`, class: 'log-entry' },
+                    { message: `Spoofing MAC address: <span class="success">00:1A:2B:3C:4D:5E</span>`, class: 'log-entry' },
+                    { message: `Cross connecting over virtual Cloud Interfaces...`, class: 'log-entry' },
+                    { message: `Secure session established. Ready for commands.`, class: 'log-entry' }
+                ];
+
+                delayedLogs(connectionLogs, 1500, 600); // 600ms interval between each log
+
+                // Cloud detection happens after connection logs
+                setTimeout(() => {
+                    const clouds = ['aws', 'gcp', 'azure', 'oracle', 'ibm'];
+                    currentCloud = clouds[Math.floor(Math.random() * clouds.length)];
+                    const detectedIP = generateRandomIP();
+
+                    const cloudLogs = [
+                        { message: `Detected cloud environment: ${currentCloud.toUpperCase()}`, class: 'success' },
+                        { message: `Assigned cloudIP address: ${detectedIP}`, class: 'info' },
+                        { message: `Using virtual cloud interface IP: ${specificIP}`, class: 'info' },
+                        { message: `Virtual cloud interfaces online: ${clouds}`, class: 'info' }
+                    ];
+
+                    delayedLogs(cloudLogs, 0, 600);
+                }, 1500 + connectionLogs.length * 600);
+            }
+
+            function delayedLogs(logs, initialDelay = 0, interval = 500) {
+                logs.forEach((log, index) => {
+                    setTimeout(() => {
+                        addOutput(log.message, log.class);
+                    }, initialDelay + index * interval);
+                });
+            }            
+
+            // Get current time for logs
+            function getTime() {
+                return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            }
+            
+            // Add output to terminal
+            function addOutput(text, type = 'info', includeNewline = true) {
+                const output = document.createElement('div');
+                
+                if (type === 'log-entry') {
+                    output.className = 'log-entry';
+                    output.innerHTML = `${text}`;
+                } else {
+                    output.className = `output ${type}`;
+                    output.innerHTML = includeNewline ? text : '';
+                    
+                    if (!includeNewline) {
+                        const span = document.createElement('span');
+                        span.className = type;
+                        span.textContent = text;
+                        output.appendChild(span);
+                    }
+                }
+                
+                terminal.appendChild(output);
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+            
+            // Execute a command
+            function executeCommand(command) {
+                addOutput(`$ ${command}`, 'command');
+                
+                const args = command.split(' ');
+                const cmd = args[0].toLowerCase();
+                args.shift();
+                
+                if (config.commands[cmd]) {
+                    config.commands[cmd].execute(args);
+                } else {
+                    addOutput(`Command not found: ${cmd}`, 'error');
+                    addOutput('Type "help" for available commands', 'info');
+                }
+            }
+            
+            // Show help menu
+            function showHelp() {
+                let helpText = 'Available Commands:\n\n';
+                
+                for (const [cmd, details] of Object.entries(config.commands)) {
+                    helpText += `${cmd.padEnd(12)} ${details.description}\n`;
+                }
+                
+                helpText += '\nExamples:\n';
+                helpText += '  scan 10.42.0.0/24       Scan a target network\n';
+                helpText += '  probe 10.42.0.45        Probe a host for open ports\n';
+                helpText += '  connect srv-web-01      Connect to a target session\n';
+                helpText += '  exfiltrate /etc/passwd  Exfiltrate data from target\n';
+                helpText += '  cert-steal 10.42.0.45   Steal SSL certificates\n';
+                helpText += '  proxy-chain 1.1.1.1,2.2.2.2 Route through proxies\n';
+                helpText += '  listen --port 9000      Start listener on port 9000\n';
+                helpText += '  send --host 10.0.0.1 --port 9000 --message "test" Send message\n';
+                
+                addOutput(helpText, 'info');
+            }
+            
+            // Command implementations
+            function executeNetworkScan(args) {
+                const target = args[0] || config.targetNetwork;
+                addOutput(`Initiating stealth scan of ${target}...`, 'info');
+                
+                // Simulate scanning with progress
+                setTimeout(() => {
+                    addOutput('Scanning... 25%', 'info');
+                    
+                    setTimeout(() => {
+                        addOutput('Scanning... 50%', 'info');
+                        
+                        setTimeout(() => {
+                            addOutput('Scanning... 75%', 'info');
+                            
+                            setTimeout(() => {
+                                addOutput(`Scan complete. Found ${Math.floor(Math.random() * 10) + 5} active hosts.`, 'success');
+                                addOutput('Use "probe [IP]" to scan individual hosts', 'info');
+                            }, 1000);
+                        }, 1000);
+                    }, 1000);
+                }, 500);
+            }
+            
+            function executeNetworkList(args) {
+                const target = args[0] || config.targetNetwork;
+                addOutput(`Listing active hosts on ${target}...`, 'info');
+
+                // Simulate scanning with progress
+                setTimeout(() => {
+                    addOutput('Scanning... 25%', 'info');
+
+                    setTimeout(() => {
+                        addOutput('Scanning... 50%', 'info');
+
+                        setTimeout(() => {
+                            addOutput('Scanning... 75%', 'info');
+
+                            setTimeout(() => {
+                                addOutput('Scan complete. The following hosts are active:', 'success');
+
+                                const activeHosts = config.activeSessions
+                                    .filter(session => session.status === 'active')
+                                    .map(session => `- ${session.ip}`);
+
+                                if (activeHosts.length === 0) {
+                                    addOutput('No active hosts found.', 'warning');
+                                } else {
+                                    activeHosts.forEach(ip => addOutput(ip, 'success'));
+                                }
+
+                                addOutput('Use "probe [IP]" to scan individual hosts', 'info');
+                            }, 1000);
+                        }, 1000);
+                    }, 1000);
+                }, 500);
+            }
+
+            function executePortProbe(args) {
+                const target = args[0] || '10.42.0.45';
+                addOutput(`Probing ports on ${target}...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput('Using fragmented packets to avoid detection...', 'info');
+                    
+                    setTimeout(() => {
+                        const openPorts = [22, 80, 443];
+                        addOutput(`Open ports found: ${openPorts.join(', ')}`, 'success');
+                    }, 1500);
+                }, 500);
+            }
+            
+            function executeInterface(args) {
+                const target = args[0] || '10.42.0.45';
+                addOutput(`Probing ports on ${target}...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput('Updating virtual cloud interface...', 'info');
+                    
+                    setTimeout(() => {
+                        const openPorts = [22, 80, 443];
+                        addOutput(`Temporary Virtual Cloud Interface set: ${openPorts.join(', ')}`, 'success');
+                    }, 1500);
+                }, 500);
+            }
+
+            function executeMAC(args) {
+                const target = args[0] || '10.42.0.45';
+                addOutput(`Probing ports on ${target}...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput('Updating virtual cloud interface...', 'info');
+                    
+                    setTimeout(() => {
+                        const openPorts = [22, 80, 443];
+                        addOutput(`Temporary Virtual Cloud Interface set: ${openPorts.join(', ')}`, 'success');
+                    }, 1500);
+                }, 500);
+            }
+
+            function executeExploit(args) {
+                const target = args[0] || '10.42.0.45';
+                const port = args[1] || '80';
+                addOutput(`Attempting exploit on ${target}:${port}...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput('Injecting payload...', 'info');
+                    
+                    setTimeout(() => {
+                        addOutput('Bypassing ASLR...', 'info');
+                        
+                        setTimeout(() => {
+                            addOutput('Exploit successful! Gained root access.', 'success');
+                        }, 1000);
+                    }, 1000);
+                }, 500);
+            }
+            
+            function executeExfiltration(args) {
+                const target = args[0] || '10.42.0.45';
+                const file = args[1] || '/etc/passwd';
+                addOutput(`Exfiltrating ${file} from ${target}...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput('Compressing data...', 'info');
+                    
+                    setTimeout(() => {
+                        addOutput('Encrypting with OTP...', 'info');
+                        
+                        setTimeout(() => {
+                            addOutput('Transmitting via DNS queries...', 'info');
+                            
+                            setTimeout(() => {
+                                addOutput('Exfiltration complete. Data received.', 'success');
+                            }, 1000);
+                        }, 1000);
+                    }, 1000);
+                }, 500);
+            }
+            
+            function deployBackdoor(args) {
+                const target = args[0] || '10.42.0.45';
+                addOutput(`Deploying backdoor on ${target}...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput('Uploading payload...', 'info');
+                    
+                    setTimeout(() => {
+                        addOutput('Setting persistence via cronjob...', 'info');
+                        
+                        setTimeout(() => {
+                            addOutput('Backdoor deployed. Listening on port 4444.', 'success');
+                            addOutput('Use "connect backdoor-[IP]" to access', 'info');
+                        }, 1000);
+                    }, 1000);
+                }, 500);
+            }
+            
+            function connectToSession(args) {
+                const session = args[0];
+                
+                if (!session) {
+                    addOutput('Usage: connect [session]', 'error');
+                    addOutput('Available sessions:', 'info');
+                    config.activeSessions.forEach(s => {
+                        addOutput(`- ${s.id} (${s.ip})`, 'info');
+                    });
+                    return;
+                }
+                
+                addOutput(`Connecting to ${session}...`, 'info');
+                
+                setTimeout(() => {
+                    addOutput('Negotiating encryption...', 'info');
+                    
+                    setTimeout(() => {
+                        addOutput('Session established. Type "exit" to return.', 'success');
+                    }, 1000);
+                }, 500);
+            }
+            
+            function certSteal(args) {
+                const target = args[0] || '10.42.0.45';
+                addOutput(`Connecting to ${target} to clone certificates...`, 'info');
+                setTimeout(() => {
+                    addOutput('Bypassing certificate pinning...', 'info');
+                    setTimeout(() => {
+                        addOutput('Stolen Certificate:\n-----BEGIN CERT-----\n...\n-----END CERT-----', 'success');
+                    }, 1500);
+                }, 1000);
+            }
+            
+            function proxyChain(args) {
+                const proxies = args[0] ? args[0].split(',') : ['192.168.1.1', '10.0.0.2', '176.32.1.1'];
+                addOutput(`Building proxy chain: ${proxies.join(' → ')}`, 'info');
+                proxies.forEach((proxy, i) => {
+                    setTimeout(() => {
+                        addOutput(`[Hop ${i+1}] Encrypting via ${proxy}...`, 'info');
+                    }, i * 800);
+                });
+            }
+            
+            function simulateSSHSteps(args) {
+                const target = args[0] || '10.42.0.45';
+                addOutput(`Initiating SSH handshake with ${target}...`, 'info');
+                
+                const steps = [
+                    { text: 'Diffie-Hellman key exchange...', delay: 1000 },
+                    { text: 'Server RSA fingerprint: SHA256:AbCdEf...', delay: 800 },
+                    { text: 'Authenticating with stolen credentials...', delay: 1200 },
+                    { text: 'SSH session established!', delay: 500, isSuccess: true }
+                ];
+                
+                steps.forEach((step, i) => {
+                    setTimeout(() => {
+                        addOutput(step.text, step.isSuccess ? 'success' : 'info');
+                    }, i * step.delay);
+                });
+            }
+            
+            function cloudRoute(args) {
+                const clouds = args[0] ? args[0].split(',') : ['aws', 'gcp', 'azure'];
+                addOutput(`Routing via cloud: ${clouds.join(' → ')}`, 'info');
+                clouds.forEach((cloud, i) => {
+                    setTimeout(() => {
+                        addOutput(`[${cloud.toUpperCase()}] Redirecting traffic...`, 'info');
+                    }, i * 1000);
+                });
+            }
+            
+            function clearTerminal() {
+                terminal.innerHTML = '';
+            }
+            
+            // Cloud-specific commands from original cloudcat
+            function handleMetadata(args) {
+                const service = args.length > 0 ? args[0] : currentCloud;
+                addOutput(`Fetching metadata for ${service.toUpperCase()}...`, 'info');
+                
+                // Simulate metadata fetch
+                setTimeout(() => {
+                    const metadata = generateMetadata(service);
+                    addOutput(metadata, 'output');
+                }, 800);
+            }
+            
+            function handleTunnel(args) {
+                if (args.length < 2) {
+                    addOutput('Usage: tunnel [source] [destination]', 'error');
+                    return;
+                }
+                
+                const [src, dest] = args;
+                addOutput(`Establishing tunnel from ${src} to ${dest}...`, 'info');
+                
+                // Simulate tunnel creation
+                setTimeout(() => {
+                    if (Math.random() > 0.1) {
+                        const tunnelId = `tun-${Math.random().toString(16).substr(2, 6)}`;
+                        addOutput(`Tunnel established (ID: ${tunnelId})`, 'success');
+                        addOutput(`Data rate: ${Math.floor(Math.random() * 1000)} KB/s`, 'info');
+                    } else {
+                        addOutput(`Tunnel failed: connection refused`, 'error');
+                    }
+                }, 1200);
+            }
+            
+            function handleExfil(args) {
+                if (args.length < 2) {
+                    addOutput('Usage: exfil [source] [destination]', 'error');
+                    return;
+                }
+                
+                const [src, dest] = args;
+                addOutput(`Starting exfiltration from ${src} to ${dest}...`, 'info');
+                
+                // Simulate exfiltration
+                setTimeout(() => {
+                    if (Math.random() > 0.1) {
+                        const progress = simulateProgress();
+                        addOutput(`Exfiltration complete. Transferred ${Math.floor(Math.random() * 500) + 100} MB`, 'success');
+                    } else {
+                        addOutput(`Exfiltration failed: access denied`, 'error');
+                    }
+                }, 2000);
+            }
+            
+            function handleShell(args) {
+                if (args.length === 0) {
+                    addOutput('Usage: shell [instance]', 'error');
+                    return;
+                }
+                
+                const instanceId = args[0];
+                addOutput(`Attempting to spawn shell on ${instanceId}...`, 'info');
+                
+                // Simulate shell spawn
+                setTimeout(() => {
+                    if (Math.random() > 0.2) {
+                        addOutput(`Shell session active on ${instanceId}`, 'success');
+                        prompt.innerHTML = `<span class="prompt-user">root</span>@<span class="prompt-host">${instanceId}</span># `;
+                        
+                        // Simulate shell interaction
+                        setTimeout(() => {
+                            addOutput(`uid=0(root) gid=0(root) groups=0(root)`, 'output');
+                        }, 300);
+                    } else {
+                        addOutput(`Shell spawn failed: insufficient permissions`, 'error');
+                    }
+                }, 1500);
+            }
+            
+            function showEnvironment() {
+                const envInfo = `
+Current Cloud Environment: ${currentCloud.toUpperCase()}
+
+Connected Instances:
+${connectedInstances.length > 0 ? connectedInstances.join('\n') : 'None'}
+
+Last Scan Results:
+${lastScanResults.length > 0 ? `${lastScanResults.length} resources cached` : 'No scan data available'}
+
+Active Listeners:
+${listeners.length > 0 ? listeners.map(l => `${l.bind}:${l.port} (${l.proto})`).join('\n') : 'None'}
+                `;
+                addOutput(envInfo, 'info');
+            }
+            
+            function listServices() {
+                if (lastScanResults.length === 0) {
+                    addOutput('No services discovered yet. Run "scan" first.', 'warning');
+                    return;
+                }
+                
+                const services = {};
+                lastScanResults.forEach(res => {
+                    if (!services[res.service]) {
+                        services[res.service] = 0;
+                    }
+                    services[res.service]++;
+                });
+                
+                let serviceText = 'Discovered Services:\n\n';
+                for (const [service, count] of Object.entries(services)) {
+                    serviceText += `${service}: ${count} instances\n`;
+                }
+                
+                addOutput(serviceText, 'info');
+            }
+            
+            function showHistory() {
+                if (commandHistory.length === 0) {
+                    addOutput('No commands in history', 'info');
+                    return;
+                }
+                
+                let historyText = 'Command History:\n\n';
+                commandHistory.forEach((cmd, idx) => {
+                    historyText += `${idx + 1}. ${cmd}\n`;
+                });
+                
+                addOutput(historyText, 'info');
+            }
+            
+function autotunnel()  { runAutoCommand('auto_tunnel'); }
+function autoproxy()   { runAutoCommand('auto_proxy'); }
+function autotest()    { runAutoCommand('auto_test'); }
+function autolisten()  { runAutoCommand('auto_listen'); }
+
+function runAutoCommand(type) {
+    clearTerminal();
+
+    const commands = {
+        auto_tunnel: [
+            `$ cloudcat tunnel --from cloud://aws-us-east-1/i-0a9f --to cloud://azure-westeurope/vm-22 --port 443`,
+            '[:: CLOUDCAT v5.2 :: TUNNEL MODE ::]',
+            '> Initializing cross-cloud tunnel...',
+            '> Authenticating with AWS instance i-0a9f... [OK]',
+            '> Authenticating with Azure VM vm-22... [OK]',
+            '> Establishing encrypted socket...',
+            '[ ENCRYPTION STATUS: ACTIVE ]',
+            '> Transmitting payload...',
+            '<div class="loading-bar"><div class="loading-fill" id="progress-bar"></div></div>',
+            '> Tunnel established successfully!',
+            '',
+            'Tunnel Info:',
+            '  ↳ Source: AWS (us-east-1) - i-0a9f',
+            '  ↳ Target: Azure (westeurope) - vm-22',
+            '  ↳ Port: 443',
+            '  ↳ Tunnel Type: Secure TCP',
+            '  ↳ Latency: 82ms',
+            '  ↳ TTL: 1h'
+        ],
+        auto_proxy: [
+            `$ cloudcat proxy --through aws://i-proxy-node --target 10.10.1.34 --port 3306`,
+            '[:: PROXY MODE ENABLED ::]',
+            '> Validating pivot node...             [OK]',
+            '> Deploying SOCKS5 beacon...          [ENGAGED]',
+            '> Accessing target 10.10.1.34:3306... [BYPASSED]',
+            '> Proxy tunnel established via i-proxy-node',
+            '  ↳ Destination Reached: MySQL internal service',
+            '  ↳ Proxy Type: SOCKS5',
+            '  ↳ Tunnel TTL: 60m'
+        ],
+        auto_test: [
+            `$ cloudcat test-connect --source gcp://cloudrun/logger --dest aws://lambda/fetcher --port 8080`,
+            '[:: SERVICE CONNECTIVITY TEST ::]',
+            '> Locating GCP Cloud Run service: logger... [OK]',
+            '> Resolving AWS Lambda target endpoint...   [Resolved IP: 3.229.84.11]',
+            '> Initiating test packet...                 [SENT]',
+            '> Awaiting response...                      [RESPONDED in 93ms]',
+            '> Connectivity Test: SUCCESS',
+            '',
+            'Summary:',
+            '  ↳ From: GCP Cloud Run (logger)',
+            '  ↳ To: AWS Lambda (fetcher)',
+            '  ↳ Protocol: TCP:8080',
+            '  ↳ Packet Loss: 0%',
+            '  ↳ Roundtrip: 93ms'
+        ],
+        auto_listen: [
+            `$ cloudcat listen --vm cloud://gcp/instance-99 --mode encrypted`,
+            '[:: CLOUDCAT LISTENER ENGAGED ::]',
+            '> Listening on GCP instance: instance-99',
+            '> Mode: Encrypted Tunnel (AES-256)',
+            '> Awaiting inbound connection...',
+            '[+] Connection received from cloud://aws/i-shellbox',
+            '[+] Remote shell established.',
+            'shell@i-shellbox:~$ whoami',
+            'shell',
+            'shell@i-shellbox:~$ uname -a',
+            'Linux i-shellbox 5.15.0-1031-cloud #35-Ubuntu SMP x86_64',
+            'shell@i-shellbox:~$ ls /var/log',
+            'auth.log  syslog  cloud-init.log',
+            'shell@i-shellbox:~$ exit',
+            '[*] Remote shell session terminated.'
+        ]
+    };
+
+    const lines = commands[type];
+    if (!lines) {
+        addOutput(`Unknown command type: ${type}`, 'error');
+        return;
+    }
+
+    let i = 0;
+
+    function typeLine() {
+        if (i < lines.length) {
+            const line = document.createElement("div");
+            line.innerHTML = lines[i];
+
+            if (lines[i].includes("loading-fill")) {
+                line.className = 'output';
+                terminal.appendChild(line);
+                setTimeout(() => {
+                    const progress = document.getElementById("progress-bar");
+                    if (progress) progress.style.width = "100%";
+                }, 100);
+                setTimeout(() => { i++; typeLine(); }, 2500);
+            } else if (lines[i].startsWith('$')) {
+                line.className = 'command';
+                terminal.appendChild(line);
+                i++;
+                setTimeout(typeLine, 400);
+            } else if (lines[i].startsWith('[::') || lines[i].startsWith('[+]') || lines[i].startsWith('[*]')) {
+                line.className = 'system';
+                terminal.appendChild(line);
+                i++;
+                setTimeout(typeLine, 400);
+            } else if (lines[i].startsWith('>')) {
+                line.className = 'info';
+                terminal.appendChild(line);
+                i++;
+                setTimeout(typeLine, 400);
+            } else if (lines[i].startsWith('  ↳')) {
+                line.className = 'output';
+                terminal.appendChild(line);
+                i++;
+                setTimeout(typeLine, 200);
+            } else if (lines[i].includes('[') && lines[i].includes(']')) {
+                line.className = 'success';
+                terminal.appendChild(line);
+                i++;
+                setTimeout(typeLine, 400);
+            } else {
+                line.className = 'output';
+                terminal.appendChild(line);
+                i++;
+                setTimeout(typeLine, 200);
+            }
+
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    }
+
+    typeLine();
+}
+
+
+function bypassFirewall(args) {
+    if (args.length < 1) {
+        addOutput("Please specify a target", 'error');
+        return;
+    }
+
+    const target = args[0];
+    addOutput(`Attempting firewall bypass on ${target}...`, 'system');
+
+    setTimeout(() => {
+        addOutput(`Analyzing firewall rules...`, 'system');
+
+        setTimeout(() => {
+            addOutput(`Detected Cisco ASA firewall v9.8(3)`, 'system');
+            addOutput(`Identifying weak rules...`, 'system');
+
+            setTimeout(() => {
+                addOutput(`Found permissive outbound rule on port 53/UDP`, 'success');
+                addOutput(`Preparing DNS tunnel...`, 'system');
+
+                setTimeout(() => {
+                    addOutput(`Tunnel established!`, 'success');
+                    addOutput(`Using encrypted DNS queries to bypass firewall`, 'info');
+                }, 1000);
+            }, 1000);
+        }, 800);
+    }, 500);
+}
+
+function portKnock(args) {
+    if (args.length < 1) {
+        addOutput("Please specify a target", 'error');
+        return;
+    }
+
+    const target = args[0];
+    const sequence = "1001,1002,1003,1004";
+
+    addOutput(`Attempting port knocking sequence on ${target}...`, 'system');
+    addOutput(`Sequence: ${sequence}`, 'system');
+
+    sequence.split(',').forEach((port, i) => {
+        setTimeout(() => {
+            addOutput(`Knocking on port ${port}...`, 'info');
+        }, i * 500);
+    });
+
+    setTimeout(() => {
+        if (Math.random() < 0.7) {
+            addOutput(`Port knocking successful!`, 'success');
+            addOutput(`Hidden SSH port now accessible at ${target}:2222`, 'system');
+        } else {
+            addOutput(`Port knocking failed`, 'error');
+            addOutput(`Target may not be configured for this sequence`, 'warning');
+        }
+    }, sequence.split(',').length * 500 + 500);
+}
+
+            function handleTabCompletion(partial) {
+                const commands = Object.keys(config.commands);
+                const matches = commands.filter(cmd => cmd.startsWith(partial));
+                
+                if (matches.length === 1) {
+                    commandInput.value = matches[0] + ' ';
+                } else if (matches.length > 1) {
+                    addOutput(`Possible completions: ${matches.join(', ')}`, 'info');
+                }
+            }
+            
+            function generateRandomIP() {
+                return Array(4).fill(0).map(() => Math.floor(Math.random() * 256)).join('.');
+            }
+            
+            function generateMetadata(service) {
+                const now = new Date();
+                const metadata = {
+                    aws: `
+AWS Instance Metadata:
+----------------------
+Instance ID: i-${Math.random().toString(16).substr(2, 8)}
+Instance Type: t2.${['micro', 'small', 'medium', 'large'][Math.floor(Math.random() * 4)]}
+AMI ID: ami-${Math.random().toString(16).substr(2, 8)}
+Region: us-east-1
+Availability Zone: us-east-1${['a', 'b', 'c', 'd'][Math.floor(Math.random() * 4)]}
+IAM Role: ${Math.random() > 0.5 ? 'cloud-admin' : 'read-only'}
+Security Groups: default, ssh-access, ${['web', 'db', 'app', 'cache'][Math.floor(Math.random() * 4)]}-sg
+Account ID: ${Math.floor(Math.random() * 900000000000) + 100000000000}
+Local IP: 172.${Math.floor(16 + Math.random() * 16)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}
+Public IP: ${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}
+Token Expiration: ${new Date(now.getTime() + 3600000).toISOString()}
+                    `,
+                    gcp: `
+GCP Instance Metadata:
+----------------------
+Instance ID: ${Math.floor(Math.random() * 10000000000000000)}
+Instance Name: instance-${Math.floor(Math.random() * 10)}
+Machine Type: projects/cloudcat-${Math.floor(Math.random() * 1000)}/machineTypes/${['n1-standard-1', 'n1-standard-2', 'e2-micro'][Math.floor(Math.random() * 3)]}
+Zone: us-central1-${['a', 'b', 'c', 'f'][Math.floor(Math.random() * 4)]}
+Network: projects/cloudcat-network/global/networks/default
+Service Account: ${Math.floor(Math.random() * 100000000000)}-compute@developer.gserviceaccount.com
+Tags: ${['http-server', 'https-server', 'ssh'][Math.floor(Math.random() * 3)]}
+Internal IP: 10.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}
+External IP: ${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}
+Token Expiration: ${new Date(now.getTime() + 3600000).toISOString()}
+                    `,
+                    azure: `
+Azure Instance Metadata:
+------------------------
+VM ID: ${Math.random().toString(16).substr(2, 8)}-${Math.random().toString(16).substr(2, 4)}-${Math.random().toString(16).substr(2, 4)}-${Math.random().toString(16).substr(2, 4)}-${Math.random().toString(16).substr(2, 12)}
+Name: cloudcat-vm${Math.floor(Math.random() * 10)}
+Type: Microsoft.Compute/virtualMachines
+Location: eastus
+Resource Group: CLOUDCAT-RG
+VM Size: Standard_${['B1s', 'B2s', 'D2s_v3', 'D4s_v3'][Math.floor(Math.random() * 4)]}
+Private IP: 10.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}
+Public IP: ${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}
+Subscription ID: ${Math.random().toString(16).substr(2, 8)}-${Math.random().toString(16).substr(2, 4)}-${Math.random().toString(16).substr(2, 4)}-${Math.random().toString(16).substr(2, 4)}-${Math.random().toString(16).substr(2, 12)}
+Token Expiration: ${new Date(now.getTime() + 3600000).toISOString()}
+                    `,
+                    default: `
+${service.toUpperCase()} Metadata:
+----------------------
+Error: No metadata plugin available for ${service}
+                    `
+                };
+                
+                return metadata[service.toLowerCase()] || metadata.default;
+            }
+            
+            function simulateProgress() {
+                const progressId = `progress-${Math.random().toString(16).substr(2, 4)}`;
+                const progressElement = document.createElement('div');
+                progressElement.id = progressId;
+                terminal.appendChild(progressElement);
+                
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += Math.floor(Math.random() * 10);
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(interval);
+                    }
+                    
+                    progressElement.innerHTML = `<span class="info">Progress: [${'='.repeat(progress/5)}${' '.repeat(20 - progress/5)}] ${progress}%</span>`;
+                    terminal.scrollTop = terminal.scrollHeight;
+                }, 200);
+            }
+
+            // New listen and send commands
+            function handleListen(args) {
+                // Parse arguments
+                const params = {};
+                for (let i = 0; i < args.length; i++) {
+                    if (args[i].startsWith('--')) {
+                        const key = args[i].substring(2);
+                        const value = i + 1 < args.length && !args[i + 1].startsWith('--') ? args[i + 1] : true;
+                        params[key] = value;
+                        if (value !== true) i++;
+                    }
+                }
+
+                const proto = params.proto || "tcp";
+                const port = params.port || "8080";
+                const bind = params.bind || "0.0.0.0";
+
+                addOutput(`[~] Initializing ${proto.toUpperCase()} listener on ${bind}:${port}...`, "info");
+
+                setTimeout(() => {
+                    listeners.push({ proto, port, bind });
+                    addOutput(`[✓] Listener active on ${bind}:${port} [${proto.toUpperCase()}]`, "success");
+                    addOutput(`    Use "send --host ${bind} --port ${port}" from another session to connect.`, "info");
+                }, 1000 + Math.random() * 2000);
+            }
+
+            function handleSend(args) {
+                // Parse arguments
+                const params = {};
+                for (let i = 0; i < args.length; i++) {
+                    if (args[i].startsWith('--')) {
+                        const key = args[i].substring(2);
+                        const value = i + 1 < args.length && !args[i + 1].startsWith('--') ? args[i + 1] : true;
+                        params[key] = value;
+                        if (value !== true) i++;
+                    }
+                }
+
+                const proto = params.proto || "tcp";
+                const port = params.port || "8080";
+                const host = params.host || "127.0.0.1";
+                const message = params.message || "(empty)";
+
+                addOutput(`[→] Connecting to ${host}:${port} via ${proto.toUpperCase()}...`, "info");
+
+                setTimeout(() => {
+                    const listenerExists = listeners.some(l => l.port === port && l.proto === proto);
+                    if (listenerExists) {
+                        addOutput(`[✓] Connection established.`, "success");
+                        setTimeout(() => {
+                            addOutput(`[⇄] Sent: "${message}"`, "info");
+                            setTimeout(() => {
+                                addOutput(`[✓] Acknowledged by target`, "success");
+                                if (params.file) {
+                                    setTimeout(() => {
+                                        addOutput(`[✓] File transfer complete (${Math.floor(Math.random() * 500) + 100} KB)`, "success");
+                                    }, 800);
+                                }
+                            }, 800);
+                        }, 800);
+                    } else {
+                        addOutput(`[✘] No listener found on ${host}:${port}`, "error");
+                    }
+                }, 1200);
+            }
+        });
+
+// Popup system for CTRL+ALT+1..0
+const popupMessages = {
+    '1': '[AGENT ALERT 1]\nTunnel integrity compromised',
+    '2': '[WARNING 2]\nUnauthorized beacon detected',
+    '3': '[INFO 3]\nProxy node rerouted successfully',
+    '4': '[SECURITY NOTICE 4]\nCertificate mismatch on endpoint',
+    '5': '[DEBUG 5]\nCloud metadata leak observed',
+    '6': '[ALERT 6]\nShell access unexpectedly closed',
+    '7': '[NOTICE 7]\nNew device joined subnet',
+    '8': '[RELAY 8]\nData relay established',
+    '9': '[MONITOR 9]\nTraffic anomaly on port 443',
+    '0': '[CRITICAL 0]\nExfil route exposed - rerouting...'
+};
+
+let popupTimeout = null;
+
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.altKey) {
+        const key = e.key;
+        if (popupMessages[key]) {
+            showPopup(popupMessages[key]);
+        }
+    }
+
+    // Dismiss popup on ESC
+    if (e.key === 'Escape') {
+        hidePopup();
+    }
+});
+
+function showPopup(message) {
+    const popup = document.getElementById('popup-container');
+    const box = document.getElementById('popup-message-box');
+
+    box.textContent = message;
+    popup.style.display = 'block';
+
+    clearTimeout(popupTimeout);
+    popupTimeout = setTimeout(() => {
+        hidePopup();
+    }, 5000); // auto-hide after 5 seconds
+}
+
+function hidePopup() {
+    const popup = document.getElementById('popup-container');
+    popup.style.display = 'none';
+}
+
+    </script>
+    <div id="popup-container" style="display:none;">
+    <div id="popup-message-box"></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TraceRoute Utility</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: black;
+      color: #00ff00;
+      font-family: "Courier New", Courier, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .terminal {
+      width: 80%;
+      height: 70%;
+      max-width: 900px;
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+    }
+    .output {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    .input-line {
+      display: flex;
+      align-items: center;
+    }
+    .prompt {
+      color: #00ff00;
+    }
+    .user-input {
+      background: transparent;
+      border: none;
+      color: #00ff00;
+      outline: none;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 1rem;
+      width: 100%;
+    }
+    .hop-number {
+      color: #ffff00;
+    }
+    .hop-time {
+      color: #00ffff;
+    }
+    .hop-ip {
+      color: #ff00ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="terminal">
+    <h1 style="text-align: center;">TraceRoute Utility</h1> 
+    <div id="output" class="output"></div>
+    <div class="input-line">
+      <span class="prompt">traceroute> </span>
+      <input type="text" id="userInput" class="user-input" autofocus />
+    </div>
+  </div>
+
+  <script>
+    // Initial welcome message
+    document.addEventListener('DOMContentLoaded', function() {
+      appendOutput("TraceRoute Utility v1.0 - Simulated Path Tracing");
+      appendOutput("Type 'help' for available commands");
+      appendOutput(" - - - ");
+    });
+
+    // Event listener for user input
+    document.getElementById('userInput').addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        const userInput = event.target.value.trim();
+        event.target.value = ''; // Clear input
+        appendOutput(`traceroute> ${userInput}`);
+        runTraceRouteCommand(userInput);
+      }
+    });
+
+    // Main command parsing function
+    function runTraceRouteCommand(command) {
+      // Split the command into parts
+      const parts = command.split(/\s+/);
+      
+      // Handle clear command
+      if (parts[0].toLowerCase() === 'clear') {
+        clearScreen();
+        return;
+      }
+      
+      // Handle help command
+      if (parts[0].toLowerCase() === 'help') {
+        displayHelp();
+        return;
+      }
+      
+      // Validate that the command starts with "traceroute"
+      if (parts[0].toLowerCase() !== 'traceroute') {
+        displayError("Invalid command. Please start with 'traceroute'.");
+        return;
+      }
+
+      // Check if target is provided
+      if (parts.length < 2) {
+        displayError("Please provide a target (e.g., 'traceroute example.com')");
+        return;
+      }
+
+      // Extract flags and target
+      const target = parts[parts.length - 1];
+      const flags = parts.slice(1, parts.length - 1);
+      
+      // Parse flags
+      const options = {
+        numeric: false,    // -n flag
+        maxHops: 30,       // -m flag
+        port: 33434,       // -p flag
+        waitTime: 3        // -w flag
+      };
+      
+      for (let i = 0; i < flags.length; i++) {
+        const flag = flags[i];
+        
+        switch (flag) {
+          case '-n':
+            options.numeric = true;
+            break;
+          case '-m':
+            if (i + 1 < flags.length && !isNaN(flags[i + 1])) {
+              options.maxHops = parseInt(flags[i + 1]);
+              i++;
+            } else {
+              displayError("Please specify max hops after -m (e.g., '-m 15')");
+              return;
+            }
+            break;
+          case '-p':
+            if (i + 1 < flags.length && !isNaN(flags[i + 1])) {
+              options.port = parseInt(flags[i + 1]);
+              i++;
+            } else {
+              displayError("Please specify port after -p (e.g., '-p 33434')");
+              return;
+            }
+            break;
+          case '-w':
+            if (i + 1 < flags.length && !isNaN(flags[i + 1])) {
+              options.waitTime = parseInt(flags[i + 1]);
+              i++;
+            } else {
+              displayError("Please specify wait time after -w (e.g., '-w 5')");
+              return;
+            }
+            break;
+          default:
+            displayError(`Unknown flag: ${flag}`);
+            return;
+        }
+      }
+      
+      // Run the traceroute simulation
+      runTraceRoute(target, options);
+    }
+
+    // TraceRoute simulation function
+    function runTraceRoute(target, options) {
+      appendOutput(`traceroute to ${target} (${generateRandomIP()}), ${options.maxHops} hops max, ${options.port} byte packets`);
+      
+      // Generate random path
+      const path = generateRandomPath(target, options.maxHops);
+      let currentHop = 1;
+      
+      function displayNextHop() {
+        if (currentHop > path.length) return;
+        
+        const hop = path[currentHop - 1];
+        let line = ` ${currentHop.toString().padStart(2, ' ')}  `;
+        
+        // Display each probe response
+        for (let i = 0; i < 3; i++) {
+          if (hop.time[i] !== null) {
+            line += `${hop.time[i].toFixed(3)} ms  `;
+          } else {
+            line += `*  `;
+          }
+        }
+        
+        // Display hop info
+        if (options.numeric) {
+          line += hop.ip;
+        } else {
+          line += `${hop.hostname} (${hop.ip})`;
+        }
+        
+        // Additional info for the final hop
+        if (currentHop === path.length) {
+          line += `  [destination]`;
+        } else if (hop.asn) {
+          line += `  [AS${hop.asn}]`;
+        }
+        
+        appendOutput(line);
+        currentHop++;
+        
+        // Continue with next hop or finish
+        if (currentHop <= path.length) {
+          setTimeout(displayNextHop, 500);
+        } else {
+          appendOutput(" - - - ");
+        }
+      }
+      
+      // Start displaying hops
+      setTimeout(displayNextHop, 500);
+    }
+
+    // Generate a random traceroute path
+    function generateRandomPath(target, maxHops) {
+      const path = [];
+      const hopCount = Math.min(8 + Math.floor(Math.random() * 7), maxHops);
+      const destinationIP = generateRandomIP();
+      
+      // Generate intermediate hops
+      for (let i = 0; i < hopCount - 1; i++) {
+        path.push({
+          ip: generateRandomIP(),
+          hostname: generateRandomHostname(),
+          time: [
+            Math.random() * 20 + 5,
+            Math.random() * 20 + 5,
+            Math.random() * 20 + 5
+          ],
+          asn: Math.random() > 0.3 ? Math.floor(Math.random() * 50000) : null
+        });
+      }
+      
+      // Add destination as final hop
+      path.push({
+        ip: destinationIP,
+        hostname: target,
+        time: [
+          Math.random() * 30 + 10,
+          Math.random() * 30 + 10,
+          Math.random() * 30 + 10
+        ],
+        asn: Math.floor(Math.random() * 50000)
+      });
+      
+      // Randomly drop some packets (simulate timeouts)
+      for (let i = 0; i < path.length; i++) {
+        if (Math.random() < 0.1) { // 10% chance of timeout
+          const which = Math.floor(Math.random() * 3);
+          path[i].time[which] = null;
+        }
+      }
+      
+      return path;
+    }
+
+    // Generate random IP address
+    function generateRandomIP() {
+      return `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+    }
+
+    // Generate random hostname
+    function generateRandomHostname() {
+      const prefixes = ['router', 'core', 'edge', 'gw', 'switch', 'firewall', 'isp'];
+      const suffixes = ['nyc', 'lax', 'chi', 'lon', 'par', 'fra', 'tok', 'sin'];
+      const domains = ['net', 'com', 'isp', 'bb', 'tel'];
+      
+      return `${prefixes[Math.floor(Math.random() * prefixes.length)]}-${suffixes[Math.floor(Math.random() * suffixes.length)]}${Math.floor(Math.random() * 10)}.${domains[Math.floor(Math.random() * domains.length)]}`;
+    }
+
+    // Display help information
+    function displayHelp() {
+      appendOutput("TraceRoute Utility Help:");
+      appendOutput("Usage: traceroute [options] <host>");
+      appendOutput("Options:");
+      appendOutput("  -n              Do not resolve hostnames");
+      appendOutput("  -m <maxhops>    Set maximum number of hops");
+      appendOutput("  -p <port>       Set destination port");
+      appendOutput("  -w <waittime>   Set wait time for each probe");
+      appendOutput("Examples:");
+      appendOutput("  traceroute example.com");
+      appendOutput("  traceroute -n -m 20 8.8.8.8");
+      appendOutput("  traceroute -p 33434 -w 5 google.com");
+      appendOutput(" - - - ");
+    }
+
+    // Output helper functions
+    function displayOutput(text) {
+      const outputDiv = document.getElementById("output");
+      const p = document.createElement("p");
+      p.innerHTML = text;
+      outputDiv.appendChild(p);
+      outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+
+    function displayError(message) {
+      const outputDiv = document.getElementById("output");
+      const p = document.createElement("p");
+      p.innerText = `Error: ${message}`;
+      p.style.color = "red";
+      outputDiv.appendChild(p);
+      outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+
+    function appendOutput(text) {
+      const outputDiv = document.getElementById("output");
+      outputDiv.innerHTML += `<div>${text}</div>`;
+      outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+
+    function clearScreen() {
+      document.getElementById("output").innerHTML = "";
+    }
+  </script>
+</body>
+</html>

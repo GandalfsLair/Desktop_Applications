@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetProbeX Advanced Toolkit</title>
+  <style>
+    /* ====== General Styling ====== */
+    body {
+      background-color: #0a0f1a;
+      color: #00ff9c;
+      font-family: 'Courier New', Courier, monospace;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    #terminal {
+      padding: 1rem;
+      height: 100vh;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    #output {
+      flex-grow: 1;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    #input-line {
+      display: flex;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
+
+    .prompt {
+      color: #00e6e6;
+      margin-right: 0.5rem;
+    }
+
+    input[type="text"] {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #00ff9c;
+      font-family: inherit;
+      font-size: 1em;
+      flex: 1;
+    }
+
+    /* Message types */
+    .error { color: #ff5555; }
+    .warning { color: #ffaa00; }
+    .success { color: #55ff55; }
+    .info { color: #55aaff; }
+    .data { color: #ffffff; }
+    .system { color: #aa55ff; }
+    .critical { color: #ff0000; font-weight: bold; }
+    .covert { color: #555555; font-style: italic; }
+    .physical { color: #ff7700; }
+    .stealth { color: #333333; }
+    .encrypted { color: #aa00ff; }
+    .blink {
+      animation: blink 1s steps(2, start) infinite;
+    }
+    
+    @keyframes blink {
+      to { visibility: hidden; }
+    }
+  </style>
+</head>
+<body>
+  <div id="terminal">
+    <div id="output"></div>
+    <div id="input-line">
+      <span class="prompt">netprobex#</span>
+      <input type="text" id="commandInput" autocomplete="off" autofocus />
+      <span class="blink"></span>
+    </div>
+  </div>
+
+  <script>
+    // ====== Core State ======
+    const terminalState = {
+      commandHistory: [],
+      historyIndex: -1,
+      currentInput: '',
+      connections: {},
+      currentConnection: null,
+      implants: [],
+      c2Channels: [],
+      opsec: {
+        spoofedIdentity: null,
+        trafficProfile: 'default',
+        stealthMode: false,
+        encryption: false
+      },
+      modules: {
+        loaded: ['modbus', 's7comm', 'dnp3', 'ethernet/ip', 'opcua', 'mqtt', 'bacnet'],
+        active: []
+      }
+    };
+
+    // ====== Core Functions ======
+    const Core = {
+      simulateScan: async (target, ports = []) => {
+        if (ports.length === 0) ports = [502, 20000, 44818, 47808, 1911, 9600, 2404, 1962];
+        
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        return {
+          target,
+          portsScanned: ports,
+          devicesFound: [
+            {
+              model: "Siemens S7-1200",
+              type: "PLC",
+              ip: target,
+              mac: "00:1C:06:4F:2A:3B",
+              openPorts: [102, 502],
+              protocols: ["S7Comm", "Modbus TCP"],
+              vulnerabilities: ["S7Comm Hardcoded Credentials", "Modbus Unauthenticated Access"]
+            },
+            {
+              model: "Rockwell Allen-Bradley 1756-L71",
+              type: "PLC",
+              ip: `${target.split('.')[0]}.${target.split('.')[1]}.${target.split('.')[2]}.${parseInt(target.split('.')[3])+1}`,
+              mac: "00:00:BC:12:34:56",
+              openPorts: [44818, 2222],
+              protocols: ["EtherNet/IP", "CIP"],
+              vulnerabilities: ["CIP Command Injection"]
+            }
+          ]
+        };
+      },
+      
+      simulateConnect: async (ip, port, protocol) => {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        const connectionId = `conn_${Date.now()}`;
+        let functions = [];
+        
+        switch(protocol.toLowerCase()) {
+          case 'modbus':
+            functions = [
+              {name: "read_coils", description: "Read coil status (0x01)"},
+              {name: "read_discrete", description: "Read discrete inputs (0x02)"},
+              {name: "write_coil", description: "Write single coil (0x05)"},
+              {name: "covert_channel", description: "Establish covert communication channel"}
+            ];
+            break;
+          case 's7comm':
+            functions = [
+              {name: "read_area", description: "Read data area"},
+              {name: "write_area", description: "Write data area"},
+              {name: "plc_stop", description: "Stop PLC (dangerous!)"},
+              {name: "plc_start", description: "Start PLC"}
+            ];
+            break;
+          case 'dnp3':
+            functions = [
+              {name: "read_analog", description: "Read analog inputs"},
+              {name: "freeze_counters", description: "Freeze counters at current value"},
+              {name: "cold_restart", description: "Perform cold restart"}
+            ];
+            break;
+          default:
+            functions = [
+              {name: "read", description: "Generic read"},
+              {name: "write", description: "Generic write"}
+            ];
+        }
+        
+        return {
+          success: true,
+          message: `Connected to ${ip}:${port} via ${protocol}`,
+          connectionId,
+          functions
+        };
+      },
+      
+      simulateExecute: async (connectionId, functionName, args = []) => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        let response;
+        if (functionName.includes('read')) {
+          response = {
+            status: "success",
+            data: Array(8).fill(0).map((_, i) => ({
+              address: i,
+              value: Math.round(Math.random() * 100),
+              timestamp: new Date().toISOString()
+            }))
+          };
+        } else if (functionName.includes('write')) {
+          response = {
+            status: "success",
+            message: `Wrote value ${args[1] || 'N/A'} to address ${args[0] || 'N/A'}`
+          };
+        } else if (functionName === 'plc_stop') {
+          response = {
+            status: "critical",
+            message: `PLC STOP command executed - industrial process may be disrupted!`
+          };
+        } else {
+          response = {
+            status: "success",
+            message: `Executed ${functionName} with args: ${args.join(', ')}`
+          };
+        }
+        
+        return {
+          success: true,
+          response
+        };
+      },
+      
+      simulateVulnerabilityScan: async (target, protocol = null) => {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const commonVulns = [
+          {
+            name: "Default Credentials",
+            severity: "high",
+            description: "Device is using factory default credentials",
+            remediation: "Change default credentials immediately"
+          },
+          {
+            name: "Unencrypted Communication",
+            severity: "medium",
+            description: "Protocol communication is not encrypted",
+            remediation: "Enable encryption or use VPN tunnel"
+          }
+        ];
+        
+        let protocolVulns = [];
+        if (protocol) {
+          switch(protocol.toLowerCase()) {
+            case 'modbus':
+              protocolVulns.push({
+                name: "Unauthenticated Function Codes",
+                severity: "critical",
+                description: "Modbus protocol allows unauthenticated access to all function codes",
+                remediation: "Implement network segmentation or MODBUS firewall"
+              });
+              break;
+            case 's7comm':
+              protocolVulns.push({
+                name: "S7 Stop PLC Vulnerability",
+                severity: "critical",
+                description: "Unprotected STOP command can halt PLC operation",
+                remediation: "Implement proper access controls"
+              });
+              break;
+            case 'dnp3':
+              protocolVulns.push({
+                name: "DNP3 Unauthenticated Control",
+                severity: "critical",
+                description: "Allows unauthenticated control commands to outstation devices",
+                remediation: "Enable authentication in DNP3 configuration"
+              });
+              break;
+          }
+        }
+        
+        return {
+          target,
+          protocol,
+          vulnerabilities: [...commonVulns, ...protocolVulns]
+        };
+      },
+      
+      simulateTrafficSpoofing: async (sourceIp, targetIp, protocol) => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return {
+          success: true,
+          message: `Spoofed ${protocol} traffic from ${sourceIp} to ${targetIp}`,
+          opsecWarning: "Warning: Traffic spoofing may be detectable by network monitoring"
+        };
+      },
+      
+      simulatePayloadDelivery: async (target, payloadType) => {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return {
+          success: true,
+          message: `Delivered ${payloadType} payload to ${target}`,
+          implantId: `imp_${Date.now()}`
+        };
+      }
+    };
+
+    // ====== Exploit Modules ======
+    const ExploitEngine = {
+      s7StopPLC: async (ip) => {
+        printToTerminal(`WARNING: This will STOP the PLC at ${ip}`, 'critical');
+        printToTerminal(`This may cause physical process disruption!`, 'physical');
+        const confirm = await promptUser("Type 'CONFIRM' to proceed:");
+        if (confirm !== 'CONFIRM') return;
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        printToTerminal(`PLC ${ip} STOPPED`, 'critical');
+        terminalState.implants.push({
+          type: 's7_stop',
+          target: ip,
+          timestamp: new Date(),
+          effect: "PLC halted - industrial process interrupted"
+        });
+      },
+      
+      modbusCovertChannel: async (ip) => {
+        printToTerminal(`Establishing covert channel via Modbus...`, 'covert');
+        const result = await Core.simulateConnect(ip, 502, 'modbus');
+        
+        if (result.success) {
+          terminalState.c2Channels.push({
+            protocol: 'modbus',
+            target: ip,
+            status: 'active',
+            connectionId: result.connectionId
+          });
+          printToTerminal(`Covert C2 channel active (${ip})`, 'success');
+          printToTerminal(`Using connection ID: ${result.connectionId}`, 'covert');
+        } else {
+          printToTerminal(`Failed to establish covert channel: ${result.error}`, 'error');
+        }
+      },
+      
+      deliverPayload: async (target, payloadType) => {
+        printToTerminal(`Preparing ${payloadType} payload for ${target}...`, 'warning');
+        const confirm = await promptUser("Type 'DEPLOY' to deliver payload:");
+        if (confirm !== 'DEPLOY') return;
+        
+        try {
+          const result = await Core.simulatePayloadDelivery(target, payloadType);
+          printToTerminal(result.message, 'success');
+          terminalState.implants.push({
+            type: payloadType,
+            target: target,
+            timestamp: new Date(),
+            implantId: result.implantId
+          });
+          printToTerminal(`Implant ID: ${result.implantId}`, 'info');
+        } catch (error) {
+          printToTerminal(`Payload delivery failed: ${error.message}`, 'error');
+        }
+      }
+    };
+
+    // ====== OPSEC Modules ======
+    const Opsec = {
+      enableStealth: () => {
+        terminalState.opsec.stealthMode = true;
+        printToTerminal("Stealth mode enabled - minimizing network footprint", 'stealth');
+        printToTerminal("Warning: Some functionality may be limited in stealth mode", 'warning');
+      },
+      
+      disableStealth: () => {
+        terminalState.opsec.stealthMode = false;
+        printToTerminal("Stealth mode disabled", 'info');
+      },
+      
+      spoofIdentity: (newIdentity) => {
+        terminalState.opsec.spoofedIdentity = newIdentity;
+        printToTerminal(`Spoofing identity as: ${newIdentity}`, 'warning');
+      },
+      
+      setTrafficProfile: (profile) => {
+        terminalState.opsec.trafficProfile = profile;
+        printToTerminal(`Traffic profile set to: ${profile}`, 'info');
+      },
+      
+      enableEncryption: () => {
+        terminalState.opsec.encryption = true;
+        printToTerminal("Payload encryption enabled", 'encrypted');
+      },
+      
+      disableEncryption: () => {
+        terminalState.opsec.encryption = false;
+        printToTerminal("Payload encryption disabled", 'info');
+      }
+    };
+
+    // ====== DOM Elements ======
+    const input = document.getElementById('commandInput');
+    const output = document.getElementById('output');
+
+    // ====== Utility Functions ======
+    function printToTerminal(text, type = 'normal') {
+      if (terminalState.opsec.stealthMode && type !== 'covert' && type !== 'stealth') {
+        type = 'stealth';
+      }
+      
+      const line = document.createElement('div');
+      line.textContent = text;
+      if (type !== 'normal') line.className = type;
+      output.appendChild(line);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    async function promptUser(prompt) {
+      printToTerminal(prompt, 'system');
+      return new Promise(resolve => {
+        const oldHandler = input.onkeydown;
+        input.onkeydown = (e) => {
+          if (e.key === 'Enter') {
+            input.onkeydown = oldHandler;
+            resolve(input.value);
+            input.value = '';
+          }
+        };
+      });
+    }
+
+    // ====== Command Handlers ======
+    function handleExploit(args) {
+      if (args.length < 1) {
+        printToTerminal('Usage: exploit <module> [target] [options]', 'error');
+        printToTerminal('Available exploit modules: s7_stop, modbus_covert, deliver_payload', 'info');
+        return;
+      }
+      
+      const [module, target, ...options] = args;
+      
+      switch(module) {
+        case 's7_stop':
+          if (!target) {
+            printToTerminal('Usage: exploit s7_stop <target_ip>', 'error');
+            return;
+          }
+          ExploitEngine.s7StopPLC(target);
+          break;
+          
+        case 'modbus_covert':
+          if (!target) {
+            printToTerminal('Usage: exploit modbus_covert <target_ip>', 'error');
+            return;
+          }
+          ExploitEngine.modbusCovertChannel(target);
+          break;
+          
+        case 'deliver_payload':
+          if (!target || !options[0]) {
+            printToTerminal('Usage: exploit deliver_payload <target_ip> <payload_type>', 'error');
+            return;
+          }
+          ExploitEngine.deliverPayload(target, options[0]);
+          break;
+          
+        default:
+          printToTerminal(`Unknown exploit module: ${module}`, 'error');
+          printToTerminal("Type 'help exploit' for available modules", 'info');
+      }
+    }
+
+    function handleImplant(args) {
+      if (args.length === 0 || args[0] === 'list') {
+        const implants = terminalState.implants;
+        if (implants.length === 0) {
+          printToTerminal('No active implants', 'info');
+          return;
+        }
+        let output = 'Active Implants:\n';
+        implants.forEach(imp => {
+          output += `- ${imp.type} on ${imp.target} (${imp.timestamp.toLocaleTimeString()})\n`;
+          if (imp.implantId) output += `  ID: ${imp.implantId}\n`;
+          if (imp.effect) output += `  Effect: ${imp.effect}\n`;
+        });
+        printToTerminal(output, 'system');
+      } else if (args[0] === 'remove' && args[1]) {
+        const implantId = args[1];
+        const index = terminalState.implants.findIndex(i => i.implantId === implantId);
+        if (index !== -1) {
+          terminalState.implants.splice(index, 1);
+          printToTerminal(`Implant ${implantId} removed`, 'success');
+        } else {
+          printToTerminal(`No implant found with ID: ${implantId}`, 'error');
+        }
+      } else {
+        printToTerminal('Usage: implant [list|remove <id>]', 'error');
+      }
+    }
+    
+    function handleCovert(args) {
+      if (args.length === 0 || args[0] === 'list') {
+        const channels = terminalState.c2Channels;
+        if (channels.length === 0) {
+          printToTerminal('No active covert channels', 'covert');
+          return;
+        }
+        let output = 'Active Covert Channels:\n';
+        channels.forEach(ch => {
+          output += `- ${ch.protocol} to ${ch.target} (${ch.status})\n`;
+          if (ch.connectionId) output += `  Connection ID: ${ch.connectionId}\n`;
+        });
+        printToTerminal(output, 'covert');
+      } else if (args[0] === 'close' && args[1]) {
+        const connectionId = args[1];
+        const index = terminalState.c2Channels.findIndex(c => c.connectionId === connectionId);
+        if (index !== -1) {
+          terminalState.c2Channels.splice(index, 1);
+          printToTerminal(`Covert channel ${connectionId} closed`, 'success');
+        } else {
+          printToTerminal(`No covert channel found with ID: ${connectionId}`, 'error');
+        }
+      } else {
+        printToTerminal('Usage: covert [list|close <connection_id>]', 'error');
+      }
+    }
+    
+    function handleOpsec(args) {
+      if (args.length < 1) {
+        printToTerminal('Usage: opsec <command> [options]', 'error');
+        printToTerminal('Available commands: stealth, spoof, profile, encrypt', 'info');
+        return;
+      }
+      
+      const [command, ...options] = args;
+      
+      switch(command) {
+        case 'stealth':
+          if (options[0] === 'on') {
+            Opsec.enableStealth();
+          } else if (options[0] === 'off') {
+            Opsec.disableStealth();
+          } else {
+            printToTerminal(`Stealth mode is currently ${terminalState.opsec.stealthMode ? 'ON' : 'OFF'}`, 'info');
+          }
+          break;
+          
+        case 'spoof':
+          if (!options[0]) {
+            printToTerminal('Usage: opsec spoof <new_identity>', 'error');
+            return;
+          }
+          Opsec.spoofIdentity(options[0]);
+          break;
+          
+        case 'profile':
+          if (!options[0]) {
+            printToTerminal(`Current traffic profile: ${terminalState.opsec.trafficProfile}`, 'info');
+            return;
+          }
+          Opsec.setTrafficProfile(options[0]);
+          break;
+          
+        case 'encrypt':
+          if (options[0] === 'on') {
+            Opsec.enableEncryption();
+          } else if (options[0] === 'off') {
+            Opsec.disableEncryption();
+          } else {
+            printToTerminal(`Payload encryption is currently ${terminalState.opsec.encryption ? 'ON' : 'OFF'}`, 'info');
+          }
+          break;
+          
+        default:
+          printToTerminal(`Unknown opsec command: ${command}`, 'error');
+      }
+    }
+
+    // ====== Main Command Handler ======
+    function handleCommand(command) {
+      terminalState.commandHistory.push(command);
+      terminalState.historyIndex = -1;
+      printToTerminal(`netprobex# ${command}`, 'system');
+      
+      const parts = command.trim().split(/\s+/);
+      const cmd = parts[0].toLowerCase();
+      const args = parts.slice(1);
+
+      switch(cmd) {
+        case 'help':
+          printHelp(args[0]);
+          break;
+        case 'version':
+          printToTerminal("NetProbeX Advanced Toolkit v2.1", 'info');
+          printToTerminal("SCADA/IoT/OT Red Team Framework", 'info');
+          break;
+        case 'modules':
+          printToTerminal("Loaded modules: " + terminalState.modules.loaded.join(', '), 'info');
+          printToTerminal("Active modules: " + (terminalState.modules.active.length > 0 ? 
+            terminalState.modules.active.join(', ') : 'none'), 'info');
+          break;
+        case 'clear':
+          output.innerHTML = '';
+          break;
+        case 'scan':
+          handleScan(args);
+          break;
+        case 'connect':
+          handleConnect(args);
+          break;
+        case 'disconnect':
+          handleDisconnect(args);
+          break;
+        case 'execute':
+          handleExecute(args);
+          break;
+        case 'vulnscan':
+          handleVulnScan(args);
+          break;
+        case 'history':
+          printHistory();
+          break;
+        case 'connections':
+          listConnections();
+          break;
+        case 'set':
+          handleSetCommand(args);
+          break;
+        case 'fuzz':
+          handleFuzzCommand(args);
+          break;
+        case 'decode':
+          handleDecodeCommand(args);
+          break;
+        case 'exploit':
+          handleExploit(args);
+          break;
+        case 'implant':
+          handleImplant(args);
+          break;
+        case 'covert':
+          handleCovert(args);
+          break;
+        case 'opsec':
+          handleOpsec(args);
+          break;
+        case 'spoof':
+          handleSpoofCommand(args);
+          break;
+        default:
+          printToTerminal(`Command not found: ${cmd}`, 'error');
+          printToTerminal("Type 'help' for available commands", 'info');
+      }
+    }
+
+    // ====== Command Functions ======
+    function printHelp(specificCommand = null) {
+      if (specificCommand) {
+        // Show detailed help for specific command
+        switch(specificCommand.toLowerCase()) {
+            case 'scan':
+            printToTerminal(`
+scan <target> [ports] - Scan for SCADA/IoT devices
+
+Purpose:
+  Discovers SCADA, IoT, and OT devices on a network by scanning specified ports.
+
+Parameters:
+  target - IP address or hostname to scan
+  ports  - Optional comma-separated list of ports (default SCADA ports used if omitted)
+
+Examples:
+  scan 192.168.1.100
+  scan 192.168.1.100 502,20000,44818
+
+Output:
+  Lists discovered devices with their model, IP, open ports, protocols, and vulnerabilities.
+`, 'info');
+            break;
+            
+            case 'vulnscan':
+            printToTerminal(`
+vulnscan <target> [protocol] - Scan for known vulnerabilities
+
+Purpose:
+  Identifies known vulnerabilities in target devices or specific protocols.
+
+Parameters:
+  target   - IP address of device to scan
+  protocol - Optional protocol to check for protocol-specific vulnerabilities
+
+Examples:
+  vulnscan 192.168.1.100
+  vulnscan 192.168.1.100 modbus
+
+Output:
+  List of vulnerabilities with severity ratings, descriptions, and remediation advice.
+`, 'info');
+            break;
+
+          case 'connect':
+            printToTerminal(`
+connect <ip> <port> <protocol> - Connect to a device
+
+Purpose:
+  Establishes a connection to a SCADA/IoT device using the specified protocol.
+
+Parameters:
+  ip       - Device IP address
+  port     - Port number to connect to
+  protocol - Protocol to use (modbus, s7comm, dnp3, etc.)
+
+Examples:
+  connect 192.168.1.100 502 modbus
+  connect 192.168.1.101 102 s7comm
+
+Output:
+  Connection status and list of available functions for the connected device.
+`, 'info');
+            break;
+
+          case 'disconnect':
+            printToTerminal(`
+disconnect <connection_id> - Disconnect from a device
+
+Purpose:
+  Terminates an active connection to a device.
+
+Parameters:
+  connection_id - ID of the connection to terminate (from 'connections' command)
+
+Examples:
+  disconnect conn_123456789
+
+Output:
+  Confirmation of disconnection.
+`, 'info');
+            break;
+
+          case 'execute':
+            printToTerminal(`
+execute <connection_id> <function> [args...] - Execute command on connected device
+
+Purpose:
+  Sends a protocol-specific command to a connected device.
+
+Parameters:
+  connection_id - Active connection ID
+  function      - Protocol function to execute
+  args          - Optional arguments for the function
+
+Examples:
+  execute conn_123456789 read_coils
+  execute conn_123456789 write_area 0x100 1
+
+Output:
+  Results of the executed command, format varies by function.
+`, 'info');
+            break;
+
+          case 'connections':
+            printToTerminal(`
+connections - List active connections
+
+Purpose:
+  Displays all currently active device connections.
+
+Parameters:
+  None
+
+Examples:
+  connections
+
+Output:
+  List of active connections with their IDs, target addresses, and protocols.
+`, 'info');
+            break;
+
+          case 'exploit':
+            printToTerminal(`
+exploit <module> [target] [options] - Execute exploitation modules
+
+Purpose:
+  Runs specific exploit modules against target devices.
+
+Available modules:
+  s7_stop <target_ip>      - Stop a Siemens S7 PLC (disruptive)
+  modbus_covert <target_ip> - Establish covert channel via Modbus
+  deliver_payload <target_ip> <type> - Deliver specified payload
+
+Parameters:
+  module - Exploit module to use
+  target - Target device IP address
+  options - Module-specific options
+
+Examples:
+  exploit s7_stop 192.168.1.100
+  exploit modbus_covert 192.168.1.50
+  exploit deliver_payload 192.168.1.75 persistence
+
+Output:
+  Varies by module - typically includes status and any created implant/channel IDs.
+`, 'info');
+            break;
+
+          case 'implant':
+            printToTerminal(`
+implant [list|remove <id>] - Manage implants
+
+Purpose:
+  Lists or removes persistent implants on target devices.
+
+Parameters:
+  list   - List all active implants
+  remove - Remove specified implant by ID
+
+Examples:
+  implant list
+  implant remove imp_123456789
+
+Output:
+  For list: Details of all active implants including type, target, and timestamp
+  For remove: Confirmation of implant removal
+`, 'info');
+            break;
+
+          case 'covert':
+            printToTerminal(`
+covert [list|close <id>] - Manage covert channels
+
+Purpose:
+  Lists or terminates established covert communication channels.
+
+Parameters:
+  list   - List all active covert channels
+  close  - Close specified channel by connection ID
+
+Examples:
+  covert list
+  covert close conn_123456789
+
+Output:
+  For list: Details of active covert channels including protocol and target
+  For close: Confirmation of channel termination
+`, 'info');
+            break;
+
+          case 'opsec':
+            printToTerminal(`
+opsec <command> [options] - Operational security controls
+
+Purpose:
+  Manages operational security settings to minimize detection.
+
+Available commands:
+  stealth [on|off]     - Enable/disable stealth mode (reduces network footprint)
+  spoof <identity>     - Spoof network identity (MAC/IP/credentials)
+  profile <name>       - Set traffic profile (low_and_slow, burst, etc.)
+  encrypt [on|off]     - Enable/disable payload encryption
+
+Examples:
+  opsec stealth on
+  opsec spoof maintenance_worker
+  opsec profile low_and_slow
+  opsec encrypt on
+
+Output:
+  Confirmation of changed settings with any relevant warnings.
+`, 'info');
+            break;
+
+          case 'fuzz':
+            printToTerminal(`
+fuzz <protocol> <target> [options] - Protocol fuzzer
+
+Purpose:
+  Tests protocol implementation by sending malformed/invalid packets.
+
+Parameters:
+  protocol - Protocol to fuzz (modbus, s7comm, etc.)
+  target   - IP address of target device
+  options  - Fuzzing parameters (iterations, delay, etc.)
+
+Examples:
+  fuzz modbus 192.168.1.100
+  fuzz s7comm 192.168.1.101 iterations=500 delay=100
+
+Output:
+  Fuzzing progress and any detected anomalies or crashes.
+`, 'info');
+            break;
+
+          case 'decode':
+            printToTerminal(`
+decode <protocol> <data> - Decode protocol data
+
+Purpose:
+  Decodes raw protocol messages into human-readable format.
+
+Parameters:
+  protocol - Protocol used in the data
+  data     - Raw protocol data to decode
+
+Examples:
+  decode modbus 010100000001
+  decode s7comm 0300001902f08032010000000000080000f0000001000101e0
+
+Output:
+  Structured interpretation of the protocol message with field breakdown.
+`, 'info');
+            break;
+
+          case 'set':
+            printToTerminal(`
+set <option> <value> - Set tool options
+
+Purpose:
+  Configures various tool parameters and settings.
+
+Common options:
+  timeout    - Connection timeout in milliseconds
+  verbosity  - Output detail level (0-3)
+  auto_stealth - Enable automatic stealth mode (true/false)
+
+Examples:
+  set timeout 5000
+  set verbosity 2
+  set auto_stealth true
+
+Output:
+  Confirmation of the set value.
+`, 'info');
+            break;
+
+          case 'history':
+            printToTerminal(`
+history - Show command history
+
+Purpose:
+  Displays previously executed commands.
+
+Parameters:
+  None
+
+Examples:
+  history
+
+Output:
+  Numbered list of commands in session history.
+`, 'info');
+            break;
+
+          case 'modules':
+            printToTerminal(`
+modules - List loaded and active modules
+
+Purpose:
+  Shows available protocol modules and their status.
+
+Parameters:
+  None
+
+Examples:
+  modules
+
+Output:
+  List of loaded modules and indication of which are currently active.
+`, 'info');
+            break;
+
+          case 'version':
+            printToTerminal(`
+version - Show version information
+
+Purpose:
+  Displays tool version and capabilities.
+
+Parameters:
+  None
+
+Examples:
+  version
+
+Output:
+  Version number, release type, and supported protocols.
+`, 'info');
+            break;
+
+          case 'spoof':
+            printToTerminal(`
+spoof <protocol> <source_ip> <target_ip> - Spoof network traffic
+
+Purpose:
+  Generates spoofed network traffic between specified endpoints.
+
+Parameters:
+  protocol  - Protocol to spoof (modbus, dnp3, etc.)
+  source_ip - IP address to spoof as origin
+  target_ip - Destination IP address
+
+Examples:
+  spoof modbus 192.168.1.50 192.168.1.100
+  spoof s7comm 192.168.1.60 192.168.1.101
+
+Output:
+  Spoofing status and any operational security warnings.
+`, 'info');
+            break;
+
+          default:
+            printToTerminal(`No detailed help available for: ${specificCommand}`, 'error');
+            printToTerminal("Type 'help' to see available commands", 'info');
+        }
+        return;
+      }
+      
+      const helpText = `
+NetProbeX Advanced Toolkit - Command Reference:
+
+Core Commands:
+  help [command]       Show help (or detailed command help)
+  version              Show version information
+  modules              List loaded/active modules
+  clear                Clear the terminal
+  history              Show command history
+
+Scanning & Enumeration:
+  scan <target> [ports]    Scan for SCADA/IoT devices
+  vulnscan <target> [protocol]  Scan for known vulnerabilities
+
+Connection Management:
+  connect <ip> <port> <protocol>  Connect to a device
+  disconnect <id>       Disconnect from a device
+  connections           List active connections
+  execute <id> <cmd> [args] Execute command on connected device
+
+Exploitation:
+  exploit <module> [target] [options]  Execute exploitation modules
+  implant [list|remove <id>]  Manage implants
+  covert [list|close <id>]    Manage covert channels
+
+Protocol Tools:
+  fuzz <protocol> <target> [options]  Protocol fuzzer
+  decode <protocol> <data>    Decode protocol data
+  set <option> <value>    Set tool options
+
+Operational Security:
+  opsec <command> [options]  Operational security controls
+  spoof <traffic> <target>  Spoof network traffic
+
+Type 'help <command>' for detailed information about a specific command.
+`;
+      printToTerminal(helpText.trim(), 'info');
+    }
+
+    async function handleScan(args) {
+      if (args.length < 1) {
+        printToTerminal('Usage: scan <target> [ports]', 'error');
+        printToTerminal('Example: scan 192.168.1.100 502,20000,44818', 'info');
+        return;
+      }
+      
+      const target = args[0];
+      let ports = [];
+      
+      if (args.length > 1) {
+        ports = args[1].split(',').map(p => parseInt(p)).filter(p => !isNaN(p));
+      }
+      
+      printToTerminal(`Scanning ${target} for SCADA/IoT devices...`, 'info');
+      
+      try {
+        const results = await Core.simulateScan(target, ports);
+        printScanResults(results);
+      } catch (error) {
+        printToTerminal(`Scan failed: ${error.message}`, 'error');
+      }
+    }
+    
+    function printScanResults(results) {
+      let output = `Scan Results for ${results.target}:\n`;
+      output += `Ports scanned: ${results.portsScanned.join(', ')}\n\n`;
+      
+      if (results.devicesFound.length === 0) {
+        output += 'No SCADA/IoT devices found\n';
+        printToTerminal(output, 'data');
+        return;
+      }
+      
+      results.devicesFound.forEach(device => {
+        output += `Device: ${device.model} (${device.type})\n`;
+        output += `IP: ${device.ip}  MAC: ${device.mac}\n`;
+        output += `Open ports: ${device.openPorts.join(', ')}\n`;
+        output += `Protocols: ${device.protocols.join(', ')}\n`;
+        
+        if (device.vulnerabilities.length > 0) {
+          output += `Potential vulnerabilities:\n`;
+          device.vulnerabilities.forEach(vuln => {
+            output += `  - ${vuln}\n`;
+          });
+        }
+        
+        output += '\n';
+      });
+      
+      printToTerminal(output, 'data');
+    }
+    
+    async function handleConnect(args) {
+      if (args.length < 3) {
+        printToTerminal('Usage: connect <ip> <port> <protocol>', 'error');
+        printToTerminal('Example: connect 192.168.1.100 502 modbus', 'info');
+        return;
+      }
+      
+      const [ip, port, protocol] = args;
+      
+      printToTerminal(`Connecting to ${ip}:${port} using ${protocol}...`, 'info');
+      
+      try {
+        const result = await Core.simulateConnect(ip, parseInt(port), protocol);
+        
+        if (result.success) {
+          printToTerminal(result.message, 'success');
+          printToTerminal(`Connection ID: ${result.connectionId}`, 'info');
+          
+          // Store connection
+          terminalState.connections[result.connectionId] = {
+            ip, port, protocol,
+            functions: result.functions
+          };
+          
+          // Show available functions
+          let funcs = 'Available functions:\n';
+          result.functions.forEach(func => {
+            funcs += `  ${func.name}: ${func.description}\n`;
+          });
+          printToTerminal(funcs.trim(), 'system');
+        } else {
+          printToTerminal(`Connection failed: ${result.error}`, 'error');
+        }
+      } catch (error) {
+        printToTerminal(`Connection failed: ${error.message}`, 'error');
+      }
+    }
+    
+    async function handleDisconnect(args) {
+      if (args.length < 1) {
+        printToTerminal('Usage: disconnect <connection_id>', 'error');
+        printToTerminal('Use "connections" to list active connections', 'info');
+        return;
+      }
+      
+      const connectionId = args[0];
+      
+      if (!terminalState.connections[connectionId]) {
+        printToTerminal(`No connection found with ID: ${connectionId}`, 'error');
+        return;
+      }
+      
+      printToTerminal(`Disconnecting ${connectionId}...`, 'info');
+      
+      try {
+        // Simulate disconnection
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Remove connection
+        delete terminalState.connections[connectionId];
+        printToTerminal(`Disconnected ${connectionId}`, 'success');
+      } catch (error) {
+        printToTerminal(`Disconnection failed: ${error.message}`, 'error');
+      }
+    }
+    
+    async function handleExecute(args) {
+      if (args.length < 2) {
+        printToTerminal('Usage: execute <connection_id> <function> [args...]', 'error');
+        return;
+      }
+      
+      const [connectionId, functionName, ...funcArgs] = args;
+      
+      if (!terminalState.connections[connectionId]) {
+        printToTerminal(`No connection found with ID: ${connectionId}`, 'error');
+        return;
+      }
+      
+      printToTerminal(`Executing ${functionName} on ${connectionId}...`, 'info');
+      
+      try {
+        const result = await Core.simulateExecute(connectionId, functionName, funcArgs);
+        
+        if (result.success) {
+          printToTerminal('Execution successful:', 'success');
+          printToTerminal(JSON.stringify(result.response, null, 2), 'data');
+        } else {
+          printToTerminal(`Execution failed: ${result.error}`, 'error');
+        }
+      } catch (error) {
+        printToTerminal(`Execution failed: ${error.message}`, 'error');
+      }
+    }
+    
+    async function handleVulnScan(args) {
+      if (args.length < 1) {
+        printToTerminal('Usage: vulnscan <target> [protocol]', 'error');
+        printToTerminal('Example: vulnscan 192.168.1.100 modbus', 'info');
+        return;
+      }
+      
+      const target = args[0];
+      const protocol = args.length > 1 ? args[1] : null;
+      
+      printToTerminal(`Scanning ${target} for vulnerabilities...`, 'info');
+      
+      try {
+        const result = await Core.simulateVulnerabilityScan(target, protocol);
+        
+        if (result.vulnerabilities.length === 0) {
+          printToTerminal('No vulnerabilities found', 'info');
+          return;
+        }
+        
+        let output = `Vulnerability Scan Results for ${target}:\n`;
+        if (protocol) output += `Protocol: ${protocol}\n\n`;
+        
+        result.vulnerabilities.forEach(vuln => {
+          output += `[${vuln.severity.toUpperCase()}] ${vuln.name}\n`;
+          output += `Description: ${vuln.description}\n`;
+          output += `Remediation: ${vuln.remediation}\n\n`;
+        });
+        
+        printToTerminal(output.trim(), 'data');
+      } catch (error) {
+        printToTerminal(`Vulnerability scan failed: ${error.message}`, 'error');
+      }
+    }
+    
+    function printHistory() {
+      if (terminalState.commandHistory.length === 0) {
+        printToTerminal('No commands in history', 'info');
+        return;
+      }
+      
+      let historyText = 'Command History:\n';
+      terminalState.commandHistory.forEach((cmd, index) => {
+        historyText += `  ${index + 1}. ${cmd}\n`;
+      });
+      printToTerminal(historyText.trim(), 'system');
+    }
+    
+    function listConnections() {
+      const connections = Object.keys(terminalState.connections);
+      
+      if (connections.length === 0) {
+        printToTerminal('No active connections', 'info');
+        return;
+      }
+      
+      let output = 'Active Connections:\n';
+      connections.forEach(id => {
+        const conn = terminalState.connections[id];
+        output += `  ${id}: ${conn.ip}:${conn.port} (${conn.protocol})\n`;
+      });
+      printToTerminal(output.trim(), 'system');
+    }
+    
+    function handleSetCommand(args) {
+      if (args.length < 2) {
+        printToTerminal('Usage: set <option> <value>', 'error');
+        return;
+      }
+      
+      const [option, value] = args;
+      printToTerminal(`Set ${option} = ${value}`, 'success');
+    }
+    
+    function handleFuzzCommand(args) {
+      if (args.length < 2) {
+        printToTerminal('Usage: fuzz <protocol> <target> [options]', 'error');
+        return;
+      }
+      
+      const [protocol, target] = args;
+      printToTerminal(`Starting ${protocol} fuzzer against ${target}...`, 'warning');
+      printToTerminal('This may disrupt target device!', 'error');
+    }
+    
+    function handleDecodeCommand(args) {
+      if (args.length < 2) {
+        printToTerminal('Usage: decode <protocol> <data>', 'error');
+        return;
+      }
+      
+      const [protocol, data] = args;
+      printToTerminal(`Decoding ${protocol} data:`, 'info');
+      printToTerminal(`Raw: ${data}`, 'data');
+      printToTerminal('Decoded: [simulated decoded data]', 'data');
+    }
+    
+    function handleSpoofCommand(args) {
+      if (args.length < 3) {
+        printToTerminal('Usage: spoof <protocol> <source_ip> <target_ip>', 'error');
+        return;
+      }
+      
+      const [protocol, sourceIp, targetIp] = args;
+      printToTerminal(`Preparing to spoof ${protocol} traffic from ${sourceIp} to ${targetIp}...`, 'warning');
+      
+      Core.simulateTrafficSpoofing(sourceIp, targetIp, protocol)
+        .then(result => {
+          printToTerminal(result.message, 'success');
+          if (result.opsecWarning) {
+            printToTerminal(result.opsecWarning, 'warning');
+          }
+        })
+        .catch(error => {
+          printToTerminal(`Spoofing failed: ${error.message}`, 'error');
+        });
+    }
+
+    // ====== Event Listeners ======
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const command = input.value.trim();
+        if (command) {
+          handleCommand(command);
+          input.value = '';
+        }
+      } else if (e.key === 'ArrowUp') {
+        if (terminalState.commandHistory.length === 0) return;
+        
+        if (terminalState.historyIndex === -1) {
+          terminalState.currentInput = input.value;
+          terminalState.historyIndex = terminalState.commandHistory.length - 1;
+        } else if (terminalState.historyIndex > 0) {
+          terminalState.historyIndex--;
+        }
+        
+        input.value = terminalState.commandHistory[terminalState.historyIndex];
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown') {
+        if (terminalState.historyIndex === -1) return;
+        
+        if (terminalState.historyIndex < terminalState.commandHistory.length - 1) {
+          terminalState.historyIndex++;
+          input.value = terminalState.commandHistory[terminalState.historyIndex];
+        } else {
+          terminalState.historyIndex = -1;
+          input.value = terminalState.currentInput;
+        }
+        
+        e.preventDefault();
+      }
+    });
+
+    // Initial welcome message
+    printToTerminal("NetProbeX Advanced Toolkit v2.1", 'system');
+    printToTerminal("SCADA/IoT/OT Red Team Framework", 'system');
+    printToTerminal("Type 'help' for available commands", 'info');
+    printToTerminal("----------------------------------------", 'system');
+  </script>
+</body>
+</html>

