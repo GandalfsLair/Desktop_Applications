@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PASS</title>
+    <style>
+        body {
+            background-color: green;
+            color: black;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 50px;
+        }
+        button {
+            background-color: white;
+            color: black;
+            border: 2px solid black;
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        button:hover {
+            background-color: black;
+            color: white;
+        }
+        .progress-container {
+            width: 50%;
+            margin: 20px auto;
+            border: 2px solid black;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 30px;
+            background-color: blue;
+            transition: width 1s;
+        }
+    </style>
+</head>
+<body>
+    <h1>FORCE PAIR - PASS</h1>
+    <button onclick="upload()">UPLOAD</button>
+    <button onclick="download()">DOWNLOAD</button>
+    <button onclick="proxy()">PROXY</button>
+    <button onclick="reset()">RESET</button>
+    <button onclick="exit()">EXIT</button>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <script>
+        function upload() {
+            // Add your upload functionality here
+            var RandomTotal2 = 5; // Example value for RandomTotal2 (seconds)
+            startProgressBar(RandomTotal2, function() {
+                // Callback function to execute after progress is complete
+                setTimeout(function() {
+                    document.body.insertAdjacentHTML('beforeend', '<p>UPLOAD COMPLETE</p>');
+                }, 1000); // Wait for 1 second before printing "UPLOAD COMPLETE"
+            });
+        }
+
+        function download() {
+            // Add your download functionality here
+            var RandomTotal2 = 5; // Example value for RandomTotal2 (seconds)
+            startProgressBar(RandomTotal2, function() {
+                // Callback function to execute after progress is complete
+                setTimeout(function() {
+                    document.body.insertAdjacentHTML('beforeend', '<p>DOWNLOAD COMPLETE</p>');
+                }, 1000); // Wait for 1 second before printing "DOWNLOAD COMPLETE"
+            });
+        }
+
+        function proxy() {
+            // Add your proxy functionality here
+            var RandomTotal2 = 5; // Example value for RandomTotal2 (seconds)
+            startProgressBar(RandomTotal2, function() {
+                // Callback function to execute after progress is complete
+                setTimeout(function() {
+                    document.body.insertAdjacentHTML('beforeend', '<p>PROXY IN PLACE</p>');
+                }, 1000); // Wait for 1 second before printing "PROXY IN PLACE"
+            });
+        }
+
+        function exit() {
+            // Close the web page
+            window.close();
+        }
+
+        function reset() {
+            // Reload the page (pass.html)
+            window.location.reload();
+        }
+
+        // Function to start the progress bar animation
+        function startProgressBar(duration, callback) {
+            var progressBar = document.getElementById('progressBar');
+            progressBar.style.width = '0%'; // Reset the progress bar
+
+            var interval = 100; // Interval for updating the progress bar (milliseconds)
+            var increment = 100 / (duration * 1000 / interval); // Increment per interval
+
+            var progress = 0;
+            var timer = setInterval(function () {
+                progress += increment;
+                progressBar.style.width = progress + '%';
+                if (progress >= 100) {
+                    clearInterval(timer);
+                    if (callback) {
+                        callback(); // Execute callback function if provided
+                    }
+                }
+            }, interval);
+        }
+    </script>
+</body>
+</html>

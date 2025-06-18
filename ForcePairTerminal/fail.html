@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fail</title>
+<style>
+  body {
+    background-color: red;
+    color: black;
+    text-align: center;
+  }
+
+  button {
+    background-color: white;
+    color: black;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    margin: 10px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <h1>FORCE PAIR - FAILED</h1>
+  <button onclick="retry()">RETRY</button>
+  <button onclick="reset()">RESET</button>
+  <button onclick="exit()">EXIT</button>
+
+  <script>
+    function retry() {
+      window.location.href = "Random_1.html";
+    }
+
+    function exit() {
+            // Close the web page
+            window.close();
+    }
+
+    function reset() {
+            // Reload the page (pass.html)
+            window.location.reload();
+    }
+  </script>
+</body>
+</html>
